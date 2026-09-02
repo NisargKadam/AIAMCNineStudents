@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI AMC Nine Student Portal
 
-## Getting Started
+> AI AMC — Agentic AI Masterclass
+> Learn to build agents before agents learn to replace you.
 
-First, run the development server:
+![AI AMC Nine portal banner](docs/portal-banner.svg)
+
+AI AMC Nine is a production-minded student community and learning portal. It gives cohort members one dark-first workspace for readiness checks, profiles, GitHub assignment submissions, instructor feedback, and peer learning. The Admin Console manages the same canonical data rather than maintaining a disconnected back office.
+
+## Features
+
+- Secure email/password authentication with bcrypt, opaque revocable sessions, HTTP-only cookies, login throttling, and inactive-account enforcement
+- Database-driven, categorized prerequisite checklist with progress persistence and configuration-version reconfirmation
+- Student profiles with a public cohort directory and AES-256-GCM encrypted OpenAI API keys
+- Ten seeded, administrator-editable assignments with GitHub validation and review lifecycle tracking
+- Community feed with text, images, external/GitHub links, likes, comments, bookmarks, ownership controls, pagination, and moderation
+- Cohort dashboard plus a coherent Admin Console for analytics, students, curriculum, reviews, and audit logs
+- Responsive dark SaaS interface, keyboard focus states, loading/error/empty states, and mobile drawer navigation
+- PostgreSQL migrations, repeatable seed, CI, Docker, Cloudinary storage adapter, and Railway configuration
+
+## Architecture
+
+The application uses Next.js App Router server components for read-heavy screens and small client components for interactive workflows. Server Actions own mutations and always derive the acting user from the secure session; clients never provide an authoritative user ID. Route handlers are limited to health and authenticated image upload.
+
+PostgreSQL is the source of truth. Prisma models users, revocable sessions, profiles, checklist configuration and completion, assignments/submissions, community activity, and audit records. Unique database constraints protect email, student/assignment submissions, likes, bookmarks, and category/order keys.
+
+## Technology stack
+
+- Next.js 16 App Router, React 19, strict TypeScript
+- Tailwind CSS 4, Radix/shadcn-style primitives, Lucide React, Sonner
+- React Hook Form-compatible actions and Zod 4 server validation
+- Prisma 6 and PostgreSQL 16/17
+- bcryptjs password hashing; Node AES-256-GCM field encryption
+- Cloudinary in production, local filesystem adapter in development
+- Vitest, ESLint, Prettier, GitHub Actions
+
+## Local development
 
 ```bash
+git clone https://github.com/NisargKadam/AIAMCNineStudents.git
+cd AIAMCNineStudents
+npm install
+cp .env.example .env
+docker compose up -d db
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Docker is only needed for the convenient database service; the Next.js development server runs directly with npm.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+If Docker is unavailable, install PostgreSQL 16+ locally, create a database/user, and replace `DATABASE_URL` with that connection string before running the same Prisma commands.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+Copy `.env.example`; never commit `.env`.
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTH_SECRET` | Authentication secret generated with `openssl rand -base64 32` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment |
+| `DEFAULT_STUDENT_PASSWORD` | Initial password assigned to admin-created students |
+| `FIELD_ENCRYPTION_KEY` | Exactly 32 random bytes in base64 for AES-256-GCM |
+| `NEXT_PUBLIC_APP_NAME` | Public product name |
+| `APP_URL` | Canonical application URL |
+| `CLOUDINARY_*` | Optional locally; required for durable production image uploads |
+| `SEED_DEMO_DATA` | Creates a demo student only when exactly `true` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Generate secrets:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+openssl rand -base64 32 # AUTH_SECRET
+openssl rand -base64 32 # FIELD_ENCRYPTION_KEY
+```
 
-## Deploy on Vercel
+## Database and Prisma commands
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run db:generate          # generate the Prisma client
+npm run db:migrate           # create/apply a development migration
+npm run db:migrate:deploy    # apply checked-in migrations in production
+npm run db:seed              # repeatable admin/curriculum seed
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Production deployment uses `prisma migrate deploy`, never `db push`. The first migration lives in `prisma/migrations`.
+
+## Admin setup and student authentication
+
+Set `ADMIN_EMAIL` and a unique 12+ character `ADMIN_PASSWORD`, then run `npm run db:seed`. Public registration does not exist. An administrator creates a student with full name and email from **Admin Console → Students**. The account receives the bcrypt-hashed `DEFAULT_STUDENT_PASSWORD`; the UI never exposes hashes or saved secrets.
+
+Administrators can activate/deactivate accounts, revoke sessions through password reset, and promote/demote roles. The final active administrator cannot be demoted, and administrators cannot deactivate or demote themselves.
+
+## Project structure
+
+```text
+src/
+  app/                 routes, layouts, errors, health/upload handlers
+  components/          design-system and shell components
+  features/            auth, profile, prerequisites, assignments, community, admin
+  lib/                 database, sessions, encryption, storage, validation, policies
+prisma/
+  migrations/          production schema history
+  schema.prisma        canonical relational model
+  seed.ts              repeatable curriculum/admin seed
+tests/                 validation, security, and PostgreSQL integration tests
+docs/                  deployment operations
+```
+
+## Testing and quality
+
+PostgreSQL must be available for integration tests.
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+GitHub Actions provisions PostgreSQL 17 and runs install, client generation, migrations, lint, type checking, all tests, and the production build on pushes and pull requests.
+
+## Security
+
+- Passwords use bcrypt cost 12 in production flows.
+- Sessions use random opaque tokens; only SHA-256 token hashes are stored.
+- Cookies are HTTP-only, `SameSite=Lax`, path-scoped, and `Secure` in production.
+- Next.js Server Actions provide same-origin mutation transport; every action repeats authorization and Zod validation on the server.
+- OpenAI API keys are AES-256-GCM encrypted at rest, returned only as a last-four mask, and never logged or audited.
+- Ownership rules prevent cross-student profile, submission, post, and comment mutations.
+- Community content is rendered as text without arbitrary HTML; external links use `noopener noreferrer`.
+- Login attempts are rate limited per forwarded IP/email key.
+- Environment files, uploads, build output, and dependency directories are ignored by Git.
+- `npm audit --omit=dev` reports zero known vulnerabilities at the time of the latest verification.
+
+## Docker
+
+`docker compose up -d db` starts PostgreSQL for local work. The multi-stage `Dockerfile` builds and runs the complete application, applies production migrations at container startup, respects Railway's `PORT`, and performs health checks through `/api/health`.
+
+## Railway deployment
+
+Follow [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY_DEPLOYMENT.md) for PostgreSQL provisioning, environment variables, migrations, seed, health verification, and optional Cloudinary configuration.
+
+## GitHub workflow
+
+Create a focused branch, pull the latest `main`, implement and test, then commit and open a pull request. CI must pass before merge. Never add `.env`, database dumps, `node_modules`, `.next`, or uploaded community assets.
+
+## Creators
+
+**Creator & Co-Founder:** Nisarg Kadam
+**Co-Founder:** Rahul Dusane
+
+AI AMC Nine · Agentic AI Masterclass

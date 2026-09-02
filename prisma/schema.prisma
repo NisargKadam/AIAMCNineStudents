@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  REVIEWED
+  NEEDS_CHANGES
+  COMPLETED
+}
+
+model User {
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
+  passwordHash             String
+  role                     Role                      @default(STUDENT)
+  isActive                 Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  profile                  StudentProfile?
+  sessions                 Session[]
+  prerequisites            StudentPrerequisite[]
+  prerequisiteConfirmation PrerequisiteConfirmation?
+  submissions              AssignmentSubmission[]
+  posts                    Post[]
+  likes                    PostLike[]
+  comments                 PostComment[]
+  bookmarks                Bookmark[]
+  auditLogs                AuditLog[]                @relation("AuditActor")
+
+  @@index([role, isActive])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  identifier  String
+  succeeded   Boolean
+  attemptedAt DateTime @default(now())
+
+  @@index([identifier, attemptedAt])
+}
+
+model StudentProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  fullName              String
+  githubUsername        String?
+  linkedinUrl           String?
+  currentRole           String?
+  country               String?
+  timezone              String?
+  bio                   String?  @db.VarChar(500)
+  avatarUrl             String?
+  encryptedOpenAiApiKey String?
+  openAiKeyLastFour     String?  @db.VarChar(4)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PrerequisiteConfig {
+  id        Int      @id @default(1)
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model PrerequisiteCategory {
+  id            String         @id @default(cuid())
+  name          String
+  description   String?
+  sortOrder     Int            @unique
+  isActive      Boolean        @default(true)
+  prerequisites Prerequisite[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Prerequisite {
+  id           String                @id @default(cuid())
+  categoryId   String
+  title        String
+  description  String?
+  verification String?
+  sortOrder    Int
+  isActive     Boolean               @default(true)
+  category     PrerequisiteCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  students     StudentPrerequisite[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([categoryId, sortOrder])
+  @@index([isActive])
+}
+
+model StudentPrerequisite {
+  id             String       @id @default(cuid())
+  userId         String
+  prerequisiteId String
+  completed      Boolean      @default(false)
+  completedAt    DateTime?
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prerequisite   Prerequisite @relation(fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, prerequisiteId])
+  @@index([userId, completed])
+}
+
+model PrerequisiteConfirmation {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  confirmedAt      DateTime
+  confirmedVersion Int
+  invalidatedAt    DateTime?
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Assignment {
+  id           String                 @id @default(cuid())
+  title        String
+  description  String?
+  instructions String?
+  sortOrder    Int                    @unique
+  dueDate      DateTime?
+  isActive     Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  submissions  AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id                 String           @id @default(cuid())
+  assignmentId       String
+  userId             String
+  githubUrl          String
+  studentNote        String?          @db.VarChar(1000)
+  status             SubmissionStatus @default(SUBMITTED)
+  instructorFeedback String?          @db.VarChar(2000)
+  submittedAt        DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  reviewedAt         DateTime?
+  completedAt        DateTime?
+  assignment         Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, assignmentId])
+  @@index([status, updatedAt])
+}
+
+model Post {
+  id        String        @id @default(cuid())
+  userId    String
+  content   String?       @db.VarChar(3000)
+  imageUrl  String?
+  linkUrl   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes     PostLike[]
+  comments  PostComment[]
+  bookmarks Bookmark[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model PostComment {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  content   String   @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+}
