@@ -52,6 +52,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "4.1.11",
+    "magicast": "0.3.5",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "prettier": "^3.6.2",
@@ -68,7 +69,5 @@
   "engines": {
     "node": ">=20.9"
   },
-  "overrides": {
-    "deepmerge-ts": "8.0.2"
-  }
+  "overrides": { "deepmerge-ts": "8.0.2" }
 }
