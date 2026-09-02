@@ -1,23 +1,24 @@
 import Link from "next/link";
 import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+export const metadata = { title: "Access denied" };
+
 export default function UnauthorizedPage() {
   return (
-    <main className="grid min-h-screen place-items-center p-6 text-center">
-      <div>
-        <ShieldX className="text-accent mx-auto" size={44} />
-        <p className="text-accent mt-5 text-xs font-bold tracking-[.2em] uppercase">
-          403 · Access denied
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">
-          This area is for administrators.
+    <main className="grid min-h-svh place-items-center p-6 text-center">
+      <div className="max-w-md">
+        <span className="text-ember mx-auto grid size-12 place-items-center rounded-2xl border border-[var(--line)] bg-[var(--sunken)]">
+          <ShieldX size={22} />
+        </span>
+        <h1 className="font-display text-ink mt-6 text-2xl font-semibold">
+          The admin console is not open to your account
         </h1>
-        <p className="text-muted mx-auto mt-3 max-w-md text-sm">
-          Your account is working, but it does not have permission to access the
-          Admin Console.
+        <p className="text-dim mt-3 text-sm leading-6">
+          Your sign-in worked. Ask an administrator if you need this access.
         </p>
         <Button asChild className="mt-7">
-          <Link href="/dashboard">Return to dashboard</Link>
+          <Link href="/dashboard">Back to dashboard</Link>
         </Button>
       </div>
     </main>

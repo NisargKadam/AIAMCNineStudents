@@ -10,12 +10,18 @@ AI AMC Nine is a production-minded student community and learning portal. It giv
 ## Features
 
 - Secure email/password authentication with bcrypt, opaque revocable sessions, HTTP-only cookies, login throttling, and inactive-account enforcement
-- Database-driven, categorized prerequisite checklist with progress persistence and configuration-version reconfirmation
-- Student profiles with a public cohort directory and AES-256-GCM encrypted OpenAI API keys
-- Ten seeded, administrator-editable assignments with GitHub validation and review lifecycle tracking
-- Community feed with text, images, external/GitHub links, likes, comments, bookmarks, ownership controls, pagination, and moderation
-- Cohort dashboard plus a coherent Admin Console for analytics, students, curriculum, reviews, and audit logs
-- Responsive dark SaaS interface, keyboard focus states, loading/error/empty states, and mobile drawer navigation
+- Self-service password changes that keep the current browser signed in and revoke every other session
+- Database-driven, categorized prerequisite checklist with search, open-only filtering, progress persistence, and configuration-version reconfirmation
+- Student profiles with photo upload, a public cohort directory with search, and AES-256-GCM encrypted OpenAI API keys
+- Ten seeded, administrator-editable assignments with GitHub validation, status filtering, and review lifecycle tracking
+- Community feed with text, images, external/GitHub links, likes, comments, bookmarks, saved and authored views, inline editing, ownership controls, pagination, and moderation
+- Cohort dashboard built around a three-track progress deck, the build sequence, and a derived attention list surfaced in the header
+- Admin Console for analytics, student management, curriculum, reviews, moderation, and a paginated audit log
+- Student records that mirror the whole student portal for an administrator: overview, readiness, assignments, community activity, and account history
+- Administrators can create, edit, activate, deactivate, promote, demote, set passwords for, delete, and bulk-manage accounts, and export the filtered roster as CSV
+- Command palette (`⌘K` / `Ctrl+K`) for keyboard navigation across every page
+- Dark and light themes that persist per browser and apply before first paint
+- Depth-based interface with a fixed navigation rail, 3D page transitions, pointer-driven parallax on the dashboard deck and directory, keyboard focus states, loading/error/empty states, and mobile drawer navigation
 - PostgreSQL migrations, repeatable seed, CI, Docker, Cloudinary storage adapter, and Railway configuration
 
 ## Architecture
@@ -27,7 +33,8 @@ PostgreSQL is the source of truth. Prisma models users, revocable sessions, prof
 ## Technology stack
 
 - Next.js 16 App Router, React 19, strict TypeScript
-- Tailwind CSS 4, Radix/shadcn-style primitives, Lucide React, Sonner
+- Tailwind CSS 4 design tokens, Radix primitives, Framer Motion, Lucide React, Sonner
+- Space Grotesk, IBM Plex Sans, and JetBrains Mono through `next/font`
 - React Hook Form-compatible actions and Zod 4 server validation
 - Prisma 6 and PostgreSQL 16/17
 - bcryptjs password hashing; Node AES-256-GCM field encryption
@@ -56,17 +63,17 @@ If Docker is unavailable, install PostgreSQL 16+ locally, create a database/user
 
 Copy `.env.example`; never commit `.env`.
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `AUTH_SECRET` | Authentication secret generated with `openssl rand -base64 32` |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment |
-| `DEFAULT_STUDENT_PASSWORD` | Initial password assigned to admin-created students |
-| `FIELD_ENCRYPTION_KEY` | Exactly 32 random bytes in base64 for AES-256-GCM |
-| `NEXT_PUBLIC_APP_NAME` | Public product name |
-| `APP_URL` | Canonical application URL |
-| `CLOUDINARY_*` | Optional locally; required for durable production image uploads |
-| `SEED_DEMO_DATA` | Creates a demo student only when exactly `true` |
+| Variable                         | Purpose                                                         |
+| -------------------------------- | --------------------------------------------------------------- |
+| `DATABASE_URL`                   | PostgreSQL connection string                                    |
+| `AUTH_SECRET`                    | Authentication secret generated with `openssl rand -base64 32`  |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment               |
+| `DEFAULT_STUDENT_PASSWORD`       | Initial password assigned to admin-created students             |
+| `FIELD_ENCRYPTION_KEY`           | Exactly 32 random bytes in base64 for AES-256-GCM               |
+| `NEXT_PUBLIC_APP_NAME`           | Public product name                                             |
+| `APP_URL`                        | Canonical application URL                                       |
+| `CLOUDINARY_*`                   | Optional locally; required for durable production image uploads |
+| `SEED_DEMO_DATA`                 | Creates a demo student only when exactly `true`                 |
 
 Generate secrets:
 
@@ -90,16 +97,18 @@ Production deployment uses `prisma migrate deploy`, never `db push`. The first m
 
 Set `ADMIN_EMAIL` and a unique 12+ character `ADMIN_PASSWORD`, then run `npm run db:seed`. Public registration does not exist. An administrator creates a student with full name and email from **Admin Console → Students**. The account receives the bcrypt-hashed `DEFAULT_STUDENT_PASSWORD`; the UI never exposes hashes or saved secrets.
 
-Administrators can activate/deactivate accounts, revoke sessions through password reset, and promote/demote roles. The final active administrator cannot be demoted, and administrators cannot deactivate or demote themselves.
+Administrators can edit details, set an explicit password, reset to the cohort default, activate/deactivate accounts, promote/demote roles, delete accounts, and apply the same operations to a multi-row selection. The final active administrator cannot be demoted, deactivated, or deleted, and administrators cannot deactivate, demote, or delete themselves. Deleting an account removes its profile, checklist progress, submissions, posts, and comments, and the deletion itself is written to the audit log first so the record survives.
+
+Students change their own password from **My Profile**. The change verifies the current password, keeps the browser they used, and revokes every other session.
 
 ## Project structure
 
 ```text
 src/
   app/                 routes, layouts, errors, health/upload handlers
-  components/          design-system and shell components
-  features/            auth, profile, prerequisites, assignments, community, admin
-  lib/                 database, sessions, encryption, storage, validation, policies
+  components/          design system, shell, command palette, motion primitives
+  features/            auth, dashboard, profile, prerequisites, assignments, community, students, admin
+  lib/                 database, sessions, encryption, storage, validation, policies, signals
 prisma/
   migrations/          production schema history
   schema.prisma        canonical relational model
@@ -110,7 +119,7 @@ docs/                  deployment operations
 
 ## Testing and quality
 
-PostgreSQL must be available for integration tests.
+PostgreSQL must be available for integration tests. `vitest.config.mts` reads `.env`, so the same commands work locally and in CI.
 
 ```bash
 npm run lint

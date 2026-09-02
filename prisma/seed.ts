@@ -187,6 +187,49 @@ const categories = [
   items: Array<readonly [string, string | null]>;
 }>;
 
+const assignments = [
+  [
+    "Set up your agent workspace",
+    "Stand up the project layout, virtual environment, and configuration loader you will use for the rest of the masterclass.",
+  ],
+  [
+    "Call a model directly",
+    "Talk to a model from Python without a framework: messages, system prompts, temperature, and token accounting.",
+  ],
+  [
+    "Build a single-tool agent",
+    "Give a model one tool, handle the tool-call loop yourself, and return a grounded answer.",
+  ],
+  [
+    "Add memory and conversation state",
+    "Keep a conversation across turns, summarise it when it grows, and persist it between runs.",
+  ],
+  [
+    "Design a tool suite",
+    "Write three tools with clear schemas and error handling, then let the agent choose between them.",
+  ],
+  [
+    "Retrieval over your own documents",
+    "Chunk, embed, and retrieve source material so the agent answers from your data instead of guessing.",
+  ],
+  [
+    "Multi-agent handoffs",
+    "Split a task across specialised agents and pass structured work between them.",
+  ],
+  [
+    "Evaluate and guard your agent",
+    "Add an evaluation set, measure failures honestly, and put guardrails on the risky paths.",
+  ],
+  [
+    "Ship it behind an API",
+    "Wrap the agent in a service with logging, timeouts, retries, and a health check.",
+  ],
+  [
+    "Capstone: an agent that earns its keep",
+    "Pick a real workflow, build the agent end to end, and defend the design decisions in your README.",
+  ],
+] satisfies Array<readonly [string, string]>;
+
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -247,16 +290,18 @@ async function main() {
     }
   }
 
-  for (let index = 1; index <= 10; index += 1) {
+  for (const [index, [title, description]] of assignments.entries()) {
+    const sortOrder = index + 1;
+    const existing = await prisma.assignment.findUnique({
+      where: { sortOrder },
+    });
+    // Only rewrite the placeholder titles from earlier seeds; anything an
+    // administrator has renamed is left exactly as they set it.
+    const isPlaceholder = existing?.title === `Assignment ${sortOrder}`;
     await prisma.assignment.upsert({
-      where: { sortOrder: index },
-      update: {},
-      create: {
-        title: `Assignment ${index}`,
-        description:
-          "Put the module concepts into practice and submit your GitHub repository.",
-        sortOrder: index,
-      },
+      where: { sortOrder },
+      update: isPlaceholder ? { title, description } : {},
+      create: { title, description, sortOrder },
     });
   }
 

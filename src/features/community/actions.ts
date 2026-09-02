@@ -89,3 +89,15 @@ export async function addCommentAction(input: unknown) {
   revalidatePath("/community");
   return { success: true };
 }
+
+export async function deleteCommentAction(id: string) {
+  const user = await requireUser();
+  const comment = await db.postComment.findUnique({ where: { id } });
+  if (!comment || !canMutateOwnedResource(user, comment.userId))
+    return { error: "You can only delete your own comments." };
+  await db.postComment.delete({ where: { id } });
+  if (user.role === "ADMIN" && comment.userId !== user.id)
+    await audit(user.id, "comment_moderated", "PostComment", id);
+  revalidatePath("/community");
+  return { success: true };
+}

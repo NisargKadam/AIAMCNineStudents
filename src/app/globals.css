@@ -1,79 +1,465 @@
 @import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   AI AMC Nine — "Deck" design system
+   The portal is an instrument deck: layered panels at real depth, one
+   light source from above, and a fixed rail that anchors the space.
+------------------------------------------------------------------ */
+
 :root {
-  --background: #0e1116;
-  --foreground: #faf7f2;
-  --surface: #161b22;
-  --elevated: #1b222d;
-  --border: rgba(255, 255, 255, 0.09);
-  --muted: #9aa4b2;
-  --accent: #d6401a;
-}
-.light {
-  --background: #f4f1ec;
-  --foreground: #1a1c20;
-  --surface: #fffdfa;
-  --elevated: #f0ece5;
-  --border: rgba(10, 15, 20, 0.12);
-  --muted: #626b78;
-  --accent: #bd3c1d;
-  color-scheme: light;
-}
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-elevated: var(--elevated);
-  --color-muted: var(--muted);
-  --color-accent: var(--accent);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-* {
-  border-color: var(--border);
-}
-html {
-  background: var(--background);
+  --void: #070910;
+  --void-2: #0a0d16;
+  --panel: #0f1320;
+  --raised: #161c2b;
+  --sunken: #0b0e18;
+  --line: rgba(150, 170, 220, 0.11);
+  --line-strong: rgba(150, 170, 220, 0.2);
+  --ink: #e9edf5;
+  --ink-dim: #8792a8;
+  --ink-faint: #5d6779;
+  --ember: #ff5b2e;
+  --ember-deep: #d6401a;
+  --ember-soft: rgba(255, 91, 46, 0.14);
+  --verified: #3ddc97;
+  --caution: #ffb648;
+  --alert: #ff5f6d;
+  --halo: #6f7bff;
+  --shadow-deck:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 18px 40px -24px rgba(0, 0, 0, 0.9);
+  --shadow-lift:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 40px 80px -32px rgba(0, 0, 0, 0.95);
   color-scheme: dark;
 }
+
+:root.light {
+  --void: #e9ecf3;
+  --void-2: #eef0f6;
+  --panel: #ffffff;
+  --raised: #f7f8fc;
+  --sunken: #eaedf4;
+  --line: rgba(18, 27, 51, 0.1);
+  --line-strong: rgba(18, 27, 51, 0.18);
+  --ink: #111624;
+  --ink-dim: #57617a;
+  --ink-faint: #7c869c;
+  --ember: #d6401a;
+  --ember-deep: #b4330f;
+  --ember-soft: rgba(214, 64, 26, 0.1);
+  --verified: #0f9d6b;
+  --caution: #b7791f;
+  --alert: #d92d3f;
+  --halo: #4d59d6;
+  --shadow-deck:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 14px 30px -20px rgba(20, 30, 60, 0.35);
+  --shadow-lift:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 34px 60px -28px rgba(20, 30, 60, 0.4);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-void: var(--void);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-dim: var(--ink-dim);
+  --color-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-ember: var(--ember);
+  --color-verified: var(--verified);
+  --color-caution: var(--caution);
+  --color-alert: var(--alert);
+  --color-halo: var(--halo);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  background: var(--void);
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
-  min-height: 100vh;
-  background: var(--background);
-  color: var(--foreground);
+  min-height: 100svh;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv05" 1;
+  -webkit-font-smoothing: antialiased;
 }
-button,
-a,
-input,
-textarea,
-select {
-  outline-offset: 3px;
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
+
 :focus-visible {
-  outline: 2px solid #e4603e;
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
+
 ::selection {
-  background: rgba(214, 64, 26, 0.4);
-  color: white;
+  background: var(--ember);
+  color: #fff;
 }
+
+/* --- Scrollbars: thin, part of the chrome ----------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+  background-clip: content-box;
+}
+
+/* --- Depth ------------------------------------------------------ */
+.stage {
+  perspective: 1800px;
+  perspective-origin: 50% 20%;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-deck);
+}
+
+.panel-raised {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lift);
+}
+
 .glass {
-  background: rgba(22, 27, 34, 0.78);
-  backdrop-filter: blur(18px);
-  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--panel) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--line);
 }
-.fine-grid {
+
+/* Hairline top highlight — the single light source, from above. */
+.lit::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--ink) 22%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* --- Ambient field ---------------------------------------------- */
+.field {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(
+      color-mix(in oklab, var(--ink) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--ink) 4%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 44px 44px;
+  mask-image: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    #000 20%,
+    transparent 78%
+  );
 }
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.aurora span {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: 0.3;
+  animation: drift 26s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(1) {
+  width: 46vw;
+  height: 46vw;
+  top: -14vw;
+  left: -8vw;
+  background: color-mix(in oklab, var(--ember) 40%, transparent);
+}
+.aurora span:nth-child(2) {
+  width: 38vw;
+  height: 38vw;
+  top: 26vh;
+  right: -12vw;
+  background: color-mix(in oklab, var(--halo) 34%, transparent);
+  animation-delay: -9s;
+}
+.aurora span:nth-child(3) {
+  width: 30vw;
+  height: 30vw;
+  bottom: -12vw;
+  left: 32vw;
+  background: color-mix(in oklab, var(--verified) 20%, transparent);
+  animation-delay: -16s;
+}
+
+:root.light .aurora span {
+  opacity: 0.13;
+  filter: blur(130px);
+}
+:root.light .field {
+  opacity: 0.6;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4vw, -3vh, 0) scale(1.16);
+  }
+}
+
+/* --- Navigation glide -------------------------------------------
+   Replays on every route change because template.tsx remounts.
+------------------------------------------------------------------ */
+.glide {
+  animation: glide 460ms cubic-bezier(0.16, 0.84, 0.24, 1) both;
+  transform-origin: 50% 0%;
+}
+
+@keyframes glide {
+  from {
+    opacity: 0;
+    filter: blur(7px);
+    transform: perspective(1800px) translate3d(0, 18px, -120px) rotateX(6deg);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: perspective(1800px) translate3d(0, 0, 0) rotateX(0deg);
+  }
+}
+
+/* Children stagger into the settled plane behind the parent glide. */
+.glide > * {
+  animation: settle 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.glide > *:nth-child(1) {
+  animation-delay: 30ms;
+}
+.glide > *:nth-child(2) {
+  animation-delay: 75ms;
+}
+.glide > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.glide > *:nth-child(n + 4) {
+  animation-delay: 160ms;
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: settle 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* --- Route progress bar ----------------------------------------- */
+@keyframes crawl {
+  0% {
+    transform: scaleX(0.02);
+  }
+  60% {
+    transform: scaleX(0.7);
+  }
+  100% {
+    transform: scaleX(0.94);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -220% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+      90deg,
+      transparent 20%,
+      color-mix(in oklab, var(--ink) 7%, transparent) 50%,
+      transparent 80%
+    )
+    var(--sunken);
+  background-size: 220% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* --- Ember pulse used on live/status dots ----------------------- */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--verified) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.live-dot {
+  animation: pulse-ring 2.6s ease-out infinite;
+}
+
 .text-balance {
   text-wrap: balance;
 }
+.text-pretty {
+  text-wrap: pretty;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .glide,
+  .glide > *,
+  .rise {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
+/* --- Overlay choreography (Radix data-state driven) -------------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) translate(-50%, -46%) translateZ(-120px)
+      rotateX(9deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) translate(-50%, -50%) translateZ(0)
+      rotateX(0deg);
+  }
+}
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.97);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: perspective(900px) translateY(-8px) rotateX(-10deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(900px) translateY(0) rotateX(0);
+  }
+}
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: perspective(1000px) translate(-50%, -18px) translateZ(-90px)
+      rotateX(10deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1000px) translate(-50%, 0) translateZ(0) rotateX(0);
+  }
+}
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) translateX(-24px) rotateY(12deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) translateX(0) rotateY(0);
   }
 }

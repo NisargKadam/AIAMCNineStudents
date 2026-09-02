@@ -101,3 +101,26 @@ export const reviewSchema = z.object({
   status: z.enum(["REVIEWED", "NEEDS_CHANGES", "COMPLETED"]),
   feedback: z.string().trim().max(2000).optional(),
 });
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z
+    .string()
+    .min(12, "Use at least 12 characters")
+    .max(200)
+    .refine(
+      (value) => /[a-z]/i.test(value) && /\d/.test(value),
+      "Include at least one letter and one number",
+    ),
+});
+export const studentUpdateSchema = z.object({
+  userId: z.string().min(1),
+  fullName: z.string().trim().min(2).max(100),
+  email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
+  githubUsername: z.string().trim().max(39).optional(),
+  currentRole: z.string().trim().max(100).optional(),
+  country: z.string().trim().max(80).optional(),
+});
+export const adminPasswordSchema = z.object({
+  userId: z.string().min(1),
+  password: z.string().min(12, "Use at least 12 characters").max(200),
+});

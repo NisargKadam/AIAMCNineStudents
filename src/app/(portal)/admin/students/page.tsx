@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { StudentManager } from "@/features/admin/student-manager";
-export const metadata = { title: "Manage Students" };
+
+export const metadata = { title: "Manage students" };
+
 export default async function AdminStudentsPage() {
+  const admin = await requireAdmin();
   const [users, prereqTotal, assignmentTotal] = await Promise.all([
     db.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -22,25 +26,30 @@ export default async function AdminStudentsPage() {
     }),
     db.assignment.count({ where: { isActive: true } }),
   ]);
+
   return (
     <>
       <PageHeader
-        eyebrow="Admin Console"
+        eyebrow="Admin console"
         title="Student management"
-        description="Create accounts, review progress, control access, and reset credentials without exposing passwords."
+        description="Add accounts, edit details, control access, set passwords, and remove people who are no longer in the cohort."
       />
       <StudentManager
-        students={users.map((u) => ({
-          id: u.id,
-          email: u.email,
-          role: u.role,
-          isActive: u.isActive,
-          name: u.profile?.fullName ?? u.email,
-          avatarUrl: u.profile?.avatarUrl ?? null,
-          githubUsername: u.profile?.githubUsername ?? null,
-          prereqDone: u.prerequisites.length,
+        currentAdminId={admin.id}
+        students={users.map((user) => ({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          isActive: user.isActive,
+          name: user.profile?.fullName ?? user.email,
+          avatarUrl: user.profile?.avatarUrl ?? null,
+          githubUsername: user.profile?.githubUsername ?? null,
+          currentRole: user.profile?.currentRole ?? null,
+          country: user.profile?.country ?? null,
+          joinedAt: user.createdAt.toISOString(),
+          prereqDone: user.prerequisites.length,
           prereqTotal,
-          assignmentDone: u.submissions.length,
+          assignmentDone: user.submissions.length,
           assignmentTotal,
         }))}
       />

@@ -1,85 +1,74 @@
 "use client";
 import { useActionState, useState } from "react";
-import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { loginAction } from "@/features/auth/actions";
-import { Input } from "@/components/ui/input";
+import { Field, Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
 export function LoginForm() {
   const [state, action, pending] = useActionState(loginAction, null);
   const [show, setShow] = useState(false);
+
   return (
     <form action={action} className="space-y-5">
-      <div>
-        <label
-          htmlFor="email"
-          className="mb-2 block text-xs font-semibold text-white"
-        >
-          Email
-        </label>
+      <Field label="Email" htmlFor="email">
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="you@example.com"
+        />
+      </Field>
+
+      <Field label="Password" htmlFor="password">
         <div className="relative">
-          <Mail className="text-muted absolute top-3.5 left-3.5" size={17} />
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="you@example.com"
-            className="pl-10"
-          />
-        </div>
-      </div>
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <label
-            htmlFor="password"
-            className="text-xs font-semibold text-white"
-          >
-            Password
-          </label>
-        </div>
-        <div className="relative">
-          <LockKeyhole
-            className="text-muted absolute top-3.5 left-3.5"
-            size={17}
-          />
           <Input
             id="password"
             name="password"
             type={show ? "text" : "password"}
             autoComplete="current-password"
             required
-            className="px-10"
-            placeholder="Enter your password"
+            className="pr-11"
+            placeholder="Your cohort password"
           />
           <button
             type="button"
             onClick={() => setShow(!show)}
-            className="text-muted absolute top-3 right-3 hover:text-white"
+            className="text-faint hover:text-ink absolute top-1/2 right-3 -translate-y-1/2 rounded p-1 transition-colors"
             aria-label={show ? "Hide password" : "Show password"}
           >
-            {show ? <EyeOff size={19} /> : <Eye size={19} />}
+            {show ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
         </div>
-      </div>
-      <label className="text-muted flex cursor-pointer items-center gap-2 text-xs">
+      </Field>
+
+      <label className="text-dim flex w-fit cursor-pointer items-center gap-2.5 text-xs">
         <input
           type="checkbox"
           name="remember"
-          className="size-4 accent-[#d6401a]"
+          className="accent-ember size-4 rounded"
         />
-        Remember me for 30 days
+        Stay signed in for 30 days
       </label>
+
       {state?.error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-xs text-red-300"
+          className="rounded-xl border border-[color-mix(in_oklab,var(--alert)_35%,transparent)] bg-[color-mix(in_oklab,var(--alert)_12%,transparent)] px-3.5 py-3 text-xs leading-5 text-[var(--alert)]"
         >
           {state.error}
         </p>
       )}
+
       <Button className="w-full" size="lg" disabled={pending}>
-        {pending && <LoaderCircle className="animate-spin" size={17} />}Sign in
+        {pending ? (
+          <LoaderCircle className="animate-spin" size={17} />
+        ) : (
+          <ArrowRight size={17} />
+        )}
+        {pending ? "Signing in" : "Sign in"}
       </Button>
     </form>
   );

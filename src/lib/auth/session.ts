@@ -37,6 +37,17 @@ export async function destroySession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
+/** Signs every other device out while keeping this browser signed in. */
+export async function revokeOtherSessions(userId: string) {
+  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  await db.session.deleteMany({
+    where: {
+      userId,
+      ...(token ? { NOT: { tokenHash: hashSessionToken(token) } } : {}),
+    },
+  });
+}
+
 export const getCurrentUser = cache(async () => {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;

@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
 export default function NotFound() {
   return (
-    <main className="grid min-h-screen place-items-center p-6 text-center">
-      <div>
-        <Compass className="text-accent mx-auto" size={44} />
-        <p className="text-accent mt-5 text-xs font-bold tracking-[.2em] uppercase">
-          404 · Off course
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">
-          That page doesn’t exist.
+    <main className="grid min-h-svh place-items-center p-6 text-center">
+      <div className="max-w-md">
+        <span className="text-ember mx-auto grid size-12 place-items-center rounded-2xl border border-[var(--line)] bg-[var(--sunken)]">
+          <Compass size={22} />
+        </span>
+        <h1 className="font-display text-ink mt-6 text-2xl font-semibold">
+          There is no page here
         </h1>
-        <p className="text-muted mt-3 text-sm">
-          Let’s get you back to the cohort workspace.
+        <p className="text-dim mt-3 text-sm leading-6">
+          The link may be out of date. Your dashboard has everything current.
         </p>
         <Button asChild className="mt-7">
           <Link href="/dashboard">Go to dashboard</Link>

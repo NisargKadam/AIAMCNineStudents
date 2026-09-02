@@ -9,9 +9,13 @@ import {
   upsertPrerequisiteAction,
 } from "@/features/prerequisites/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Field, Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Confirm } from "@/components/ui/dialog";
+import { pluralize } from "@/lib/utils";
+
 type Item = {
   id: string;
   title: string;
@@ -28,73 +32,92 @@ type Category = {
   isActive: boolean;
   items: Item[];
 };
-function ItemEditor({ categoryId, item }: { categoryId: string; item: Item }) {
+
+function ItemEditor({
+  categoryId,
+  item,
+  onDone,
+}: {
+  categoryId: string;
+  item: Item;
+  onDone?: () => void;
+}) {
   const [data, setData] = useState(item);
   const [pending, start] = useTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   return (
-    <div className="border-t border-white/[.05] py-4">
-      <div className="grid gap-3 lg:grid-cols-[4rem_1fr_auto]">
-        <Input
-          aria-label="Sort order"
-          type="number"
-          min={1}
-          value={data.sortOrder}
-          onChange={(e) =>
-            setData({ ...data, sortOrder: Number(e.target.value) })
-          }
-        />
-        <Input
-          aria-label="Prerequisite title"
-          value={data.title}
-          onChange={(e) => setData({ ...data, title: e.target.value })}
-        />
-        <label className="text-muted flex items-center gap-2 text-xs">
+    <div className="border-t border-[var(--line)] py-4">
+      <div className="grid gap-3 lg:grid-cols-[5rem_1fr_auto] lg:items-end">
+        <Field label="Order" htmlFor={`item-order-${data.id}`}>
+          <Input
+            id={`item-order-${data.id}`}
+            type="number"
+            min={1}
+            value={data.sortOrder}
+            onChange={(event) =>
+              setData({ ...data, sortOrder: Number(event.target.value) })
+            }
+          />
+        </Field>
+        <Field label="Check" htmlFor={`item-title-${data.id}`}>
+          <Input
+            id={`item-title-${data.id}`}
+            value={data.title}
+            onChange={(event) =>
+              setData({ ...data, title: event.target.value })
+            }
+            placeholder="What must be true before day one?"
+          />
+        </Field>
+        <label className="text-dim flex h-11 cursor-pointer items-center gap-2 text-xs">
           <input
             type="checkbox"
             checked={data.isActive}
-            onChange={(e) => setData({ ...data, isActive: e.target.checked })}
-            className="accent-[#d6401a]"
+            onChange={(event) =>
+              setData({ ...data, isActive: event.target.checked })
+            }
+            className="accent-ember size-4"
           />
           Enabled
         </label>
       </div>
+
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <Textarea
+          aria-label="Description"
           className="min-h-16"
           value={data.description}
-          onChange={(e) => setData({ ...data, description: e.target.value })}
-          placeholder="Description (optional)"
+          onChange={(event) =>
+            setData({ ...data, description: event.target.value })
+          }
+          placeholder="Description shown under the check (optional)"
         />
         <Textarea
+          aria-label="How to verify"
           className="min-h-16 font-mono text-xs"
           value={data.verification}
-          onChange={(e) => setData({ ...data, verification: e.target.value })}
-          placeholder="Verification instructions (optional)"
+          onChange={(event) =>
+            setData({ ...data, verification: event.target.value })
+          }
+          placeholder="How to verify it, e.g. run `python --version`"
         />
       </div>
+
       <div className="mt-3 flex justify-end gap-2">
         {data.id && (
           <Button
             variant="danger"
             size="sm"
-            onClick={() => {
-              if (
-                confirm(
-                  "Delete this prerequisite? Student checklist history for it will also be removed.",
-                )
-              )
-                start(async () => {
-                  await deletePrerequisiteAction(data.id);
-                  toast.success("Prerequisite deleted.");
-                });
-            }}
+            aria-label="Delete this check"
+            onClick={() => setConfirmDelete(true)}
           >
             <Trash2 size={13} />
           </Button>
         )}
         <Button
           size="sm"
-          disabled={pending || !data.title}
+          disabled={pending || !data.title.trim()}
           onClick={() =>
             start(async () => {
               const result = await upsertPrerequisiteAction({
@@ -102,10 +125,10 @@ function ItemEditor({ categoryId, item }: { categoryId: string; item: Item }) {
                 categoryId,
               });
               if (result.error) toast.error(result.error);
-              else
-                toast.success(
-                  data.id ? "Prerequisite updated." : "Prerequisite created.",
-                );
+              else {
+                toast.success(data.id ? "Check saved." : "Check added.");
+                onDone?.();
+              }
             })
           }
         >
@@ -117,83 +140,112 @@ function ItemEditor({ categoryId, item }: { categoryId: string; item: Item }) {
           Save
         </Button>
       </div>
+
+      <Confirm
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this check?"
+        description="Student progress recorded against it is removed too, and everyone will be asked to reconfirm."
+        confirmLabel="Delete check"
+        pending={pending}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          start(async () => {
+            await deletePrerequisiteAction(data.id);
+            toast.success("Check deleted.");
+          });
+        }}
+      />
     </div>
   );
 }
+
 function CategoryEditor({ category }: { category: Category }) {
   const [data, setData] = useState(category);
   const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
-  const nextOrder = Math.max(0, ...category.items.map((i) => i.sortOrder)) + 1;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const nextOrder =
+    Math.max(0, ...category.items.map((item) => item.sortOrder)) + 1;
+
   return (
     <Card className="overflow-hidden">
-      <details open className="group">
-        <summary className="flex cursor-pointer list-none items-center gap-3 p-5">
-          <span className="bg-accent/10 grid size-9 place-items-center rounded-xl text-xs font-bold text-[#ff987e]">
-            {data.sortOrder}
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 p-4 text-left"
+      >
+        <span className="text-faint num grid size-9 shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--sunken)] font-mono text-[11px]">
+          {String(data.sortOrder).padStart(2, "0")}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="font-display text-ink block truncate text-sm font-semibold">
+            {data.name}
           </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-white">
-              {data.name}
-            </h2>
-            <p className="text-muted mt-1 text-[11px]">
-              {data.items.length} items ·{" "}
-              {data.isActive ? "active" : "disabled"}
-            </p>
-          </div>
-          <ChevronDown
-            size={16}
-            className="text-muted transition group-open:rotate-180"
-          />
-        </summary>
-        <div className="border-t border-white/[.06] p-5">
-          <div className="grid gap-3 lg:grid-cols-[5rem_1fr_2fr_auto]">
-            <Input
-              type="number"
-              min={1}
-              value={data.sortOrder}
-              onChange={(e) =>
-                setData({ ...data, sortOrder: Number(e.target.value) })
-              }
-            />
-            <Input
-              value={data.name}
-              onChange={(e) => setData({ ...data, name: e.target.value })}
-            />
-            <Input
-              value={data.description}
-              onChange={(e) =>
-                setData({ ...data, description: e.target.value })
-              }
-              placeholder="Category description"
-            />
-            <label className="text-muted flex items-center gap-2 text-xs">
+          <span className="text-faint mt-0.5 block text-[11px]">
+            {category.items.length} {pluralize(category.items.length, "check")}
+          </span>
+        </span>
+        {!data.isActive && <Badge tone="neutral">Hidden</Badge>}
+        <ChevronDown
+          size={16}
+          className={`text-faint shrink-0 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="rise border-t border-[var(--line)] p-5">
+          <div className="grid gap-3 lg:grid-cols-[5rem_1fr_1.6fr_auto] lg:items-end">
+            <Field label="Order" htmlFor={`cat-order-${data.id}`}>
+              <Input
+                id={`cat-order-${data.id}`}
+                type="number"
+                min={1}
+                value={data.sortOrder}
+                onChange={(event) =>
+                  setData({ ...data, sortOrder: Number(event.target.value) })
+                }
+              />
+            </Field>
+            <Field label="Name" htmlFor={`cat-name-${data.id}`}>
+              <Input
+                id={`cat-name-${data.id}`}
+                value={data.name}
+                onChange={(event) =>
+                  setData({ ...data, name: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Description" htmlFor={`cat-desc-${data.id}`}>
+              <Input
+                id={`cat-desc-${data.id}`}
+                value={data.description}
+                onChange={(event) =>
+                  setData({ ...data, description: event.target.value })
+                }
+                placeholder="What this group of checks covers"
+              />
+            </Field>
+            <label className="text-dim flex h-11 cursor-pointer items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={data.isActive}
-                onChange={(e) =>
-                  setData({ ...data, isActive: e.target.checked })
+                onChange={(event) =>
+                  setData({ ...data, isActive: event.target.checked })
                 }
-                className="accent-[#d6401a]"
+                className="accent-ember size-4"
               />
               Active
             </label>
           </div>
+
           <div className="mt-3 flex justify-end gap-2">
             <Button
               variant="danger"
               size="sm"
-              onClick={() => {
-                if (
-                  confirm(
-                    "Delete this category and every prerequisite inside it?",
-                  )
-                )
-                  start(async () => {
-                    await deleteCategoryAction(data.id);
-                    toast.success("Category deleted.");
-                  });
-              }}
+              aria-label="Delete this category"
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 size={13} />
             </Button>
@@ -204,7 +256,7 @@ function CategoryEditor({ category }: { category: Category }) {
                 start(async () => {
                   const result = await upsertCategoryAction(data);
                   if (result.error) toast.error(result.error);
-                  else toast.success("Category updated.");
+                  else toast.success("Category saved.");
                 })
               }
             >
@@ -216,14 +268,17 @@ function CategoryEditor({ category }: { category: Category }) {
               Save category
             </Button>
           </div>
+
           <div className="mt-5">
             {category.items.map((item) => (
               <ItemEditor key={item.id} categoryId={category.id} item={item} />
             ))}
           </div>
+
           {adding && (
             <ItemEditor
               categoryId={category.id}
+              onDone={() => setAdding(false)}
               item={{
                 id: "",
                 title: "",
@@ -234,6 +289,7 @@ function CategoryEditor({ category }: { category: Category }) {
               }}
             />
           )}
+
           <Button
             className="mt-4"
             variant="secondary"
@@ -241,13 +297,30 @@ function CategoryEditor({ category }: { category: Category }) {
             onClick={() => setAdding(!adding)}
           >
             <Plus size={13} />
-            Add prerequisite
+            Add a check
           </Button>
         </div>
-      </details>
+      )}
+
+      <Confirm
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`Delete “${data.name}”?`}
+        description="Every check inside it goes too, along with the progress students recorded against them."
+        confirmLabel="Delete category"
+        pending={pending}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          start(async () => {
+            await deleteCategoryAction(data.id);
+            toast.success("Category deleted.");
+          });
+        }}
+      />
     </Card>
   );
 }
+
 export function PrerequisiteManager({
   categories,
   currentVersion,
@@ -258,27 +331,37 @@ export function PrerequisiteManager({
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
   const [name, setName] = useState("");
-  const nextOrder = Math.max(0, ...categories.map((c) => c.sortOrder)) + 1;
+  const nextOrder =
+    Math.max(0, ...categories.map((category) => category.sortOrder)) + 1;
+  const totalChecks = categories.reduce(
+    (sum, category) => sum + category.items.length,
+    0,
+  );
+
   return (
     <>
-      <div className="mb-5 flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/[.07] bg-white/[.025] p-4 sm:flex-row sm:items-center">
-        <p className="text-muted text-xs">
-          Active configuration version{" "}
-          <b className="text-white">v{currentVersion}</b>. Every definition
-          change increments the version.
+      <Card className="mb-4 flex flex-col items-start justify-between gap-3 p-4 sm:flex-row sm:items-center">
+        <p className="text-dim text-xs leading-5">
+          {categories.length} {pluralize(categories.length, "category")} and{" "}
+          {totalChecks} {pluralize(totalChecks, "check")} at version{" "}
+          <b className="text-ink num">{currentVersion}</b>. Editing any
+          definition asks every student to reconfirm.
         </p>
         <Button onClick={() => setAdding(!adding)}>
           <Plus size={15} />
-          Create Category
+          New category
         </Button>
-      </div>
+      </Card>
+
       {adding && (
-        <Card className="mb-4 p-5">
-          <div className="flex gap-3">
+        <Card className="rise mb-3 p-4">
+          <div className="flex gap-2">
             <Input
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.target.value)}
               placeholder="Category name"
+              aria-label="New category name"
+              autoFocus
             />
             <Button
               disabled={pending || !name.trim()}
@@ -293,6 +376,7 @@ export function PrerequisiteManager({
                   if (result.error) toast.error(result.error);
                   else {
                     toast.success("Category created.");
+                    setName("");
                     setAdding(false);
                   }
                 })
@@ -304,7 +388,8 @@ export function PrerequisiteManager({
           </div>
         </Card>
       )}
-      <div className="space-y-4">
+
+      <div className="space-y-2.5">
         {categories.map((category) => (
           <CategoryEditor key={category.id} category={category} />
         ))}

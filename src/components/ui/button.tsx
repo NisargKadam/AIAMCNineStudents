@@ -2,34 +2,43 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+
 const styles = cva(
-  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 active:scale-[.98]",
+  "relative inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold whitespace-nowrap transition-[transform,background-color,color,box-shadow,border-color] duration-200 disabled:pointer-events-none disabled:opacity-45 active:translate-y-px",
   {
     variants: {
       variant: {
         default:
-          "bg-accent text-white shadow-[0_8px_28px_rgba(214,64,26,.25)] hover:bg-[#e34b23]",
+          "bg-ember text-white shadow-[0_10px_26px_-10px_var(--ember)] hover:brightness-110 hover:shadow-[0_16px_34px_-12px_var(--ember)]",
         secondary:
-          "border border-white/10 bg-white/[.06] text-foreground hover:bg-white/[.1]",
-        ghost: "text-muted hover:bg-white/[.06] hover:text-white",
-        danger: "bg-red-500/15 text-red-300 hover:bg-red-500/25",
+          "border border-[var(--line-strong)] bg-[var(--raised)] text-ink hover:border-[var(--ink-faint)] hover:bg-[color-mix(in_oklab,var(--raised)_70%,var(--ink)_8%)]",
+        ghost: "text-dim hover:bg-[var(--raised)] hover:text-ink",
+        outline:
+          "border border-[var(--line-strong)] text-ink hover:border-ember hover:text-ember",
+        danger:
+          "border border-[color-mix(in_oklab,var(--alert)_35%,transparent)] bg-[color-mix(in_oklab,var(--alert)_14%,transparent)] text-[var(--alert)] hover:bg-[color-mix(in_oklab,var(--alert)_24%,transparent)]",
+        verified:
+          "border border-[color-mix(in_oklab,var(--verified)_35%,transparent)] bg-[color-mix(in_oklab,var(--verified)_13%,transparent)] text-[var(--verified)] hover:bg-[color-mix(in_oklab,var(--verified)_22%,transparent)]",
       },
       size: {
-        default: "h-10 px-4",
+        default: "h-10 px-4 text-sm",
         sm: "h-8 px-3 text-xs",
-        lg: "h-12 px-6",
+        lg: "h-12 px-6 text-[15px]",
         icon: "size-10",
+        "icon-sm": "size-8",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
   },
 );
+
 export interface ButtonProps
   extends
     React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof styles> {
   asChild?: boolean;
 }
+
 export function Button({
   className,
   variant,

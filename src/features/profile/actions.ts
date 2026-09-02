@@ -1,10 +1,16 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import {
+  requireUser,
+  revokeOtherSessions,
+  verifyPassword,
+} from "@/lib/auth/session";
 import { encryptField } from "@/lib/encryption";
-import { profileSchema } from "@/lib/validation";
+import { passwordChangeSchema, profileSchema } from "@/lib/validation";
+import { audit } from "@/lib/audit";
 
 export async function updateProfileAction(_: unknown, formData: FormData) {
   const user = await requireUser();
@@ -62,4 +68,28 @@ export async function updateProfileAction(_: unknown, formData: FormData) {
   revalidatePath("/profile");
   revalidatePath("/dashboard");
   return { success: "Profile saved." };
+}
+
+export async function changeOwnPasswordAction(_: unknown, formData: FormData) {
+  const user = await requireUser();
+  const parsed = passwordChangeSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+  });
+  if (!parsed.success)
+    return { error: parsed.error.issues[0]?.message ?? "Check both fields." };
+  if (parsed.data.currentPassword === parsed.data.newPassword)
+    return { error: "Choose a password you have not used here before." };
+  const valid = await verifyPassword(
+    parsed.data.currentPassword,
+    user.passwordHash,
+  );
+  if (!valid) return { error: "That is not your current password." };
+  await db.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
+  });
+  await revokeOtherSessions(user.id);
+  await audit(user.id, "password_changed", "User", user.id);
+  return { success: "Password changed. Other devices were signed out." };
 }
