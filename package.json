@@ -17,7 +17,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "railway:start": "prisma migrate deploy && next start"
+    "railway:start": "prisma migrate deploy && prisma db seed && next start"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
