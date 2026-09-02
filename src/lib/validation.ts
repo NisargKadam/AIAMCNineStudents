@@ -78,6 +78,7 @@ export const studentSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
   githubUsername: z.string().trim().max(39).optional(),
+  password: z.string().min(12).max(200).optional().or(z.literal("")),
 });
 export const prerequisiteSchema = z.object({
   id: z.string().optional(),

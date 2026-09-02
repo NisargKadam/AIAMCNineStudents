@@ -79,7 +79,7 @@ export function StudentManager({ students }: { students: Student[] }) {
       {showAdd && (
         <Card className="mb-5 p-5">
           <form
-            className="grid gap-3 sm:grid-cols-3"
+            className="grid gap-3 sm:grid-cols-4"
             onSubmit={(e) => {
               e.preventDefault();
               const form = new FormData(e.currentTarget);
@@ -99,6 +99,13 @@ export function StudentManager({ students }: { students: Student[] }) {
             <Input
               name="githubUsername"
               placeholder="GitHub username (optional)"
+            />
+            <Input
+              name="password"
+              type="password"
+              minLength={12}
+              placeholder="Password (optional; 12+ chars)"
+              autoComplete="new-password"
             />
             <div className="flex justify-end sm:col-span-3">
               <Button disabled={pending} type="submit">

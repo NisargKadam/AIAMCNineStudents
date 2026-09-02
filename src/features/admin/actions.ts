@@ -12,7 +12,7 @@ export async function createStudentAction(input: unknown) {
   const admin = await requireAdmin();
   const parsed = studentSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const password = process.env.DEFAULT_STUDENT_PASSWORD;
+  const password = parsed.data.password || process.env.DEFAULT_STUDENT_PASSWORD;
   if (!password)
     return { error: "DEFAULT_STUDENT_PASSWORD is not configured." };
   const existing = await db.user.findUnique({
