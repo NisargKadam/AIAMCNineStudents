@@ -19,6 +19,8 @@ export async function upsertSessionAction(input: unknown) {
     recordingUrl: rest.recordingUrl || null,
     scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
   };
+  if (data.scheduledAt && Number.isNaN(data.scheduledAt.getTime()))
+    return { error: "That date and time could not be read." };
 
   const clash = await db.cohortSession.findUnique({
     where: { sortOrder: data.sortOrder },

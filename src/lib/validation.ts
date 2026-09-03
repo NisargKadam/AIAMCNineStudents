@@ -138,7 +138,9 @@ export const cohortSessionSchema = z.object({
   id: z.string().optional(),
   title: z.string().trim().min(2).max(150),
   description: z.string().trim().max(1000).optional(),
-  scheduledAt: z.string().optional(),
+  // A UTC instant resolved in the browser, so the administrator's timezone
+  // decides the time rather than whatever zone the server happens to run in.
+  scheduledAt: z.union([z.literal(""), z.iso.datetime()]).optional(),
   joinUrl: httpsUrl,
   recordingUrl: httpsUrl,
   sortOrder: z.coerce.number().int().positive().max(999),

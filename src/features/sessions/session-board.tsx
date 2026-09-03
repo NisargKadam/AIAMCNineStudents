@@ -20,6 +20,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Confirm, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { pluralize } from "@/lib/utils";
+import {
+  formatSessionTime,
+  isoToLocalInput,
+  localInputToIso,
+} from "./schedule";
 
 export type CohortSession = {
   id: string;
@@ -45,24 +50,6 @@ const blank = (sortOrder: number): Draft => ({
   isActive: true,
 });
 
-/** `datetime-local` wants local wall-clock time, not an ISO instant. */
-function toLocalInput(iso: string | null) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-function formatWhen(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 export function SessionBoard({
   sessions,
   canEdit,
@@ -82,13 +69,21 @@ export function SessionBoard({
   const nextOrder = Math.max(0, ...sessions.map((s) => s.sortOrder)) + 1;
 
   function save(draft: Draft) {
+    let scheduledAt: string;
+    try {
+      scheduledAt = localInputToIso(draft.scheduledAt ?? "");
+    } catch {
+      toast.error("That date and time could not be read. Pick it again.");
+      return;
+    }
+
     start(async () => {
       const result = await upsertSessionAction({
         id: draft.id || undefined,
         sortOrder: draft.sortOrder,
         title: draft.title,
         description: draft.description ?? "",
-        scheduledAt: draft.scheduledAt ?? "",
+        scheduledAt,
         joinUrl: draft.joinUrl ?? "",
         recordingUrl: draft.recordingUrl ?? "",
         isActive: draft.isActive,
@@ -116,7 +111,7 @@ export function SessionBoard({
                   {next.title}
                 </p>
                 <p className="text-dim mt-1 text-xs">
-                  {next.scheduledAt && formatWhen(next.scheduledAt)}
+                  {next.scheduledAt && formatSessionTime(next.scheduledAt)}
                 </p>
               </>
             ) : (
@@ -199,7 +194,7 @@ export function SessionBoard({
                     {session.scheduledAt && (
                       <p className="text-faint mt-2 flex items-center gap-1.5 text-[11px]">
                         <CalendarDays size={11} />
-                        {formatWhen(session.scheduledAt)}
+                        {formatSessionTime(session.scheduledAt)}
                       </p>
                     )}
                   </div>
@@ -254,7 +249,7 @@ export function SessionBoard({
                             description: session.description ?? "",
                             joinUrl: session.joinUrl ?? "",
                             recordingUrl: session.recordingUrl ?? "",
-                            scheduledAt: toLocalInput(session.scheduledAt),
+                            scheduledAt: isoToLocalInput(session.scheduledAt),
                           })
                         }
                       >
@@ -341,7 +336,7 @@ export function SessionBoard({
             <Field
               label="Date and time"
               htmlFor="session-when"
-              hint="Optional. Everyone sees it in their own timezone."
+              hint="Optional. Saved in your timezone, shown to everyone in theirs."
             >
               <Input
                 id="session-when"

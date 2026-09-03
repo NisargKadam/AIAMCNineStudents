@@ -17,6 +17,7 @@ import {
 } from "@/lib/validation";
 import { hashSessionToken, safeEqual } from "@/lib/auth/crypto";
 import { pickNextSession } from "@/features/sessions/next-session";
+import { isoToLocalInput, localInputToIso } from "@/features/sessions/schedule";
 
 beforeAll(() => {
   process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -210,5 +211,58 @@ describe("pickNextSession", () => {
         { isActive: true, scheduledAt: null },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("session scheduling across timezones", () => {
+  it("round-trips a wall-clock value unchanged", () => {
+    // What the administrator typed must be what they see when they reopen it,
+    // whatever timezone the browser or the server happens to be in.
+    for (const typed of [
+      "2026-09-07T04:00",
+      "2026-01-15T23:45",
+      "2026-06-30T00:00",
+      "2026-12-31T12:30",
+    ]) {
+      expect(isoToLocalInput(localInputToIso(typed))).toBe(typed);
+    }
+  });
+
+  it("stores a real instant rather than the raw wall-clock text", () => {
+    const iso = localInputToIso("2026-09-07T04:00");
+    expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    // The instant is the typed time interpreted in this machine's zone.
+    expect(new Date(iso).getHours()).toBe(4);
+    expect(new Date(iso).getMinutes()).toBe(0);
+  });
+
+  it("treats an empty field as no date", () => {
+    expect(localInputToIso("")).toBe("");
+    expect(localInputToIso("   ")).toBe("");
+    expect(isoToLocalInput(null)).toBe("");
+    expect(isoToLocalInput("not a date")).toBe("");
+  });
+
+  it("refuses a value it cannot read", () => {
+    expect(() => localInputToIso("31/02/2026")).toThrow();
+  });
+
+  it("accepts the ISO instant the browser sends and rejects wall-clock text", () => {
+    const base = { title: "Session 1", sortOrder: 1, isActive: true };
+    expect(
+      cohortSessionSchema.safeParse({
+        ...base,
+        scheduledAt: "2026-09-06T22:30:00.000Z",
+      }).success,
+    ).toBe(true);
+    expect(
+      cohortSessionSchema.safeParse({
+        ...base,
+        scheduledAt: "2026-09-07T04:00",
+      }).success,
+    ).toBe(false);
+    expect(
+      cohortSessionSchema.safeParse({ ...base, scheduledAt: "" }).success,
+    ).toBe(true);
   });
 });
