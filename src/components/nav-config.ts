@@ -75,7 +75,7 @@ export const navSections: NavSection[] = [
         href: "/about",
         label: "About",
         icon: Info,
-        hint: "What AI AMC Nine is",
+        hint: "What the masterclass is",
       },
     ],
   },
@@ -140,5 +140,5 @@ export function sectionForPath(path: string) {
   const section = navSections.find((s) =>
     s.items.some((item) => item.href === path),
   );
-  return section?.heading ?? "AI AMC Nine";
+  return section?.heading ?? "AI AMC";
 }

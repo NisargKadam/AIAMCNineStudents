@@ -51,8 +51,9 @@ export default async function LoginPage() {
             Learn to build agents before agents learn to replace you.
           </h1>
           <p className="text-dim mt-5 max-w-md text-sm leading-7">
-            AI AMC Nine is the workspace for the Agentic AI Masterclass cohort —
-            readiness, builds, reviews, and the people doing it alongside you.
+            The AI AMC Student Platform is the workspace for the Agentic AI
+            Masterclass — readiness, builds, reviews, and the people doing it
+            alongside you.
           </p>
 
           <div className="stage mt-9">

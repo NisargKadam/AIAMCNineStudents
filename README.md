@@ -1,11 +1,11 @@
-# AI AMC Nine Student Portal
+# AI AMC Student Platform
 
 > AI AMC — Agentic AI Masterclass
 > Learn to build agents before agents learn to replace you.
 
-![AI AMC Nine portal banner](docs/portal-banner.svg)
+![AI AMC Student Platform banner](docs/portal-banner.svg)
 
-AI AMC Nine is a production-minded student community and learning portal. It gives cohort members one dark-first workspace for readiness checks, profiles, GitHub assignment submissions, instructor feedback, and peer learning. The Admin Console manages the same canonical data rather than maintaining a disconnected back office.
+The AI AMC Student Platform is a production-minded student community and learning platform. It gives cohort members one workspace for readiness checks, profiles, GitHub assignment submissions, instructor feedback, and peer learning. The Admin Console manages the same canonical data rather than maintaining a disconnected back office.
 
 ## Features
 
@@ -13,7 +13,7 @@ AI AMC Nine is a production-minded student community and learning portal. It giv
 - Self-service password changes that keep the current browser signed in and revoke every other session
 - Database-driven, categorized prerequisite checklist with search, open-only filtering, progress persistence, and configuration-version reconfirmation
 - Student profiles with photo upload, a public cohort directory with search, and AES-256-GCM encrypted OpenAI API keys
-- Ten seeded, administrator-editable assignments with GitHub validation, status filtering, and review lifecycle tracking
+- Ten seeded, administrator-editable projects with GitHub validation, status filtering, and review lifecycle tracking
 - Community feed with text, images, external/GitHub links, likes, comments, bookmarks, saved and authored views, inline editing, ownership controls, pagination, and moderation
 - Cohort dashboard built around a three-track progress deck, the build sequence, and a derived attention list surfaced in the header
 - Admin Console for analytics, student management, curriculum, reviews, moderation, and a paginated audit log
@@ -91,6 +91,35 @@ npm run db:migrate:deploy    # apply checked-in migrations in production
 npm run db:seed              # repeatable admin/curriculum seed
 ```
 
+## Curriculum and roster
+
+The curriculum lives in `prisma/curriculum.ts`: five readiness categories with
+twenty checks, and the ten projects (Prompt Skill, LangChain, LangGraph, RAG,
+Advanced RAG, Guardrails, MCP, MultiAgent, Memory Management, Deployment).
+
+`npm run db:seed` creates that curriculum on a fresh database and never
+overwrites anything an administrator has since edited in the console. When the
+curriculum itself changes, apply it authoritatively instead — this renames what
+stays, removes checks that are no longer part of it, hides extra projects, and
+bumps the checklist version so students reconfirm:
+
+```bash
+npm run db:sync-curriculum
+railway run npm run db:sync-curriculum      # against the deployed database
+```
+
+Create accounts in bulk from a CSV with `name` and `email` columns. Rows without
+an email are reported and skipped, and an email that already has an account is
+left alone, so the import is safe to re-run:
+
+```bash
+npm run db:import-students -- ./roster.csv
+railway run npm run db:import-students -- ./roster.csv
+```
+
+Roster files hold personal data and are git-ignored. Everyone created signs in
+with `DEFAULT_STUDENT_PASSWORD`.
+
 Production deployment uses `prisma migrate deploy`, never `db push`. The first migration lives in `prisma/migrations`.
 
 ## Admin setup and student authentication
@@ -112,7 +141,9 @@ src/
 prisma/
   migrations/          production schema history
   schema.prisma        canonical relational model
+  curriculum.ts        the readiness checklist and the ten projects
   seed.ts              repeatable curriculum/admin seed
+scripts/               curriculum sync and roster import
 tests/                 validation, security, and PostgreSQL integration tests
 docs/                  deployment operations
 ```
@@ -160,4 +191,4 @@ Create a focused branch, pull the latest `main`, implement and test, then commit
 **Creator & Co-Founder:** Nisarg Kadam
 **Co-Founder:** Rahul Dusane
 
-AI AMC Nine · Agentic AI Masterclass
+AI AMC — Agentic AI Masterclass

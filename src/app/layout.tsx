@@ -24,8 +24,8 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "AI AMC Nine Student Portal",
-    template: "%s · AI AMC Nine",
+    default: "AI AMC Student Platform",
+    template: "%s · AI AMC",
   },
   description:
     "The learning and community portal for AI AMC — Agentic AI Masterclass.",

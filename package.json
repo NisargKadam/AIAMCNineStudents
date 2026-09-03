@@ -1,8 +1,8 @@
 {
-  "name": "ai-amc-nine-student-portal",
+  "name": "ai-amc-student-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "The AI AMC Nine Agentic AI Masterclass student community and learning portal.",
+  "description": "The AI AMC Agentic AI Masterclass student community and learning platform.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -17,6 +17,8 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:sync-curriculum": "tsx scripts/sync-curriculum.ts",
+    "db:import-students": "tsx scripts/import-students.ts",
     "railway:start": "prisma migrate deploy && prisma db seed && next start"
   },
   "dependencies": {

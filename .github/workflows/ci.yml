@@ -28,7 +28,7 @@ jobs:
       ADMIN_EMAIL: admin@example.test
       ADMIN_PASSWORD: ci-only-admin-password
       DEFAULT_STUDENT_PASSWORD: ci-only-student-password
-      NEXT_PUBLIC_APP_NAME: AI AMC Nine
+      NEXT_PUBLIC_APP_NAME: AI AMC Student Platform
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

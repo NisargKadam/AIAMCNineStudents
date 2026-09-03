@@ -32,7 +32,7 @@ export default function AboutPage() {
     <>
       <PageHeader
         eyebrow="About the cohort"
-        title="AI AMC Nine"
+        title="AI AMC"
         description="Agentic AI Masterclass is a focused programme for engineers who want to build the next generation of AI products — and ship them responsibly."
       />
 
@@ -46,8 +46,8 @@ export default function AboutPage() {
           Learn to build agents before agents learn to replace you.
         </blockquote>
         <p className="text-dim relative mt-6 max-w-xl text-sm leading-7">
-          Nine weeks of building, reviewing, and shipping alongside people doing
-          the same work. This portal is where that record lives.
+          Weeks of building, reviewing, and shipping alongside people doing the
+          same work. This platform is where that record lives.
         </p>
       </Card>
 

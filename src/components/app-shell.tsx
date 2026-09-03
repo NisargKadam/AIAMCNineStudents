@@ -389,14 +389,22 @@ export function AppShell({
                       View profile
                     </Link>
                   </DropdownPrimitive.Item>
-                  <DropdownPrimitive.Item asChild>
-                    <form action={logoutAction}>
-                      <button className="text-dim hover:text-ink flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-xs outline-none hover:bg-[var(--sunken)] focus:bg-[var(--sunken)]">
+                  {/* The menu must not close on select: Radix would unmount
+                      the form before the submit reaches the server action. */}
+                  <form action={logoutAction}>
+                    <DropdownPrimitive.Item
+                      asChild
+                      onSelect={(event) => event.preventDefault()}
+                    >
+                      <button
+                        type="submit"
+                        className="text-dim hover:text-ink flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-xs outline-none hover:bg-[var(--sunken)] focus:bg-[var(--sunken)]"
+                      >
                         <LogOut size={14} />
                         Sign out
                       </button>
-                    </form>
-                  </DropdownPrimitive.Item>
+                    </DropdownPrimitive.Item>
+                  </form>
                 </DropdownPrimitive.Content>
               </DropdownPrimitive.Portal>
             </DropdownPrimitive.Root>
@@ -409,6 +417,18 @@ export function AppShell({
         >
           {children}
         </main>
+
+        <footer className="mx-auto w-full max-w-[1480px] px-4 pt-2 pb-8 sm:px-6 lg:px-9">
+          <div className="flex flex-col gap-1.5 border-t border-[var(--line)] pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-faint text-[11px]">
+              Built by{" "}
+              <span className="text-dim font-medium">Nisarg Kadam</span>
+            </p>
+            <p className="text-faint text-[11px]">
+              AI AMC Student Platform — Agentic AI Masterclass
+            </p>
+          </div>
+        </footer>
       </div>
 
       <CommandPalette

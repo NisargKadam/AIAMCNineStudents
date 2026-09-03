@@ -23,7 +23,7 @@ FIELD_ENCRYPTION_KEY=<random base64 32-byte value>
 ADMIN_EMAIL=<initial admin email>
 ADMIN_PASSWORD=<strong unique initial admin password>
 DEFAULT_STUDENT_PASSWORD=<cohort initial password>
-NEXT_PUBLIC_APP_NAME=AI AMC Nine
+NEXT_PUBLIC_APP_NAME=AI AMC Student Platform
 APP_URL=https://<your-railway-domain>
 SEED_DEMO_DATA=false
 ```

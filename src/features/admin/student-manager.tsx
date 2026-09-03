@@ -167,7 +167,7 @@ export function StudentManager({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `aiamc-nine-students-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `ai-amc-students-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
     toast.success(

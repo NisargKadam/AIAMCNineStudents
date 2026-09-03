@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title description">
-  <title id="title">AI AMC Nine Student Portal</title>
-  <description id="description">Dark charcoal banner with AI AMC Nine branding and the Agentic AI Masterclass tagline.</description>
+  <title id="title">AI AMC Student Platform</title>
+  <description id="description">Dark banner with AI AMC Student Platform branding and the Agentic AI Masterclass tagline.</description>
   <defs>
     <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#161B22"/><stop offset="1" stop-color="#0E1116"/></linearGradient>
     <radialGradient id="glow"><stop stop-color="#D6401A" stop-opacity=".35"/><stop offset="1" stop-color="#D6401A" stop-opacity="0"/></radialGradient>
@@ -10,7 +10,7 @@
   <g opacity=".08" stroke="#FAF7F2"><path d="M0 60h1200M0 120h1200M0 180h1200M0 240h1200M0 300h1200"/><path d="M80 0v360M160 0v360M240 0v360M320 0v360M400 0v360M480 0v360M560 0v360M640 0v360M720 0v360M800 0v360M880 0v360M960 0v360M1040 0v360M1120 0v360"/></g>
   <rect x="76" y="72" width="64" height="64" rx="17" fill="#D6401A"/>
   <text x="108" y="112" fill="#fff" text-anchor="middle" font-family="ui-monospace, monospace" font-size="21" font-weight="800">A9</text>
-  <text x="76" y="198" fill="#FAF7F2" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" letter-spacing="-2">AI AMC Nine</text>
+  <text x="76" y="198" fill="#FAF7F2" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" letter-spacing="-2">AI AMC</text>
   <text x="78" y="238" fill="#9AA4B2" font-family="Inter, system-ui, sans-serif" font-size="21">Agentic AI Masterclass · Student Portal</text>
   <text x="78" y="293" fill="#DFA08E" font-family="Inter, system-ui, sans-serif" font-size="16">Learn to build agents before agents learn to replace you.</text>
 </svg>
