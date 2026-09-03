@@ -1,5 +1,6 @@
 import {
   BookOpenCheck,
+  CalendarDays,
   ClipboardCheck,
   GraduationCap,
   Info,
@@ -35,6 +36,12 @@ export const navSections: NavSection[] = [
         label: "Dashboard",
         icon: LayoutDashboard,
         hint: "Progress and what to do next",
+      },
+      {
+        href: "/sessions",
+        label: "Sessions",
+        icon: CalendarDays,
+        hint: "Join links and session recordings",
       },
       {
         href: "/prerequisites",

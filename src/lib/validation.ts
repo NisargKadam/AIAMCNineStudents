@@ -124,3 +124,23 @@ export const adminPasswordSchema = z.object({
   userId: z.string().min(1),
   password: z.string().min(12, "Use at least 12 characters").max(200),
 });
+
+/** Links are rendered as anchors, so only https is accepted — never javascript:. */
+const httpsUrl = z
+  .union([z.literal(""), z.url().max(500)])
+  .optional()
+  .refine(
+    (value) => !value || new URL(value).protocol === "https:",
+    "Use an https link",
+  );
+
+export const cohortSessionSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(2).max(150),
+  description: z.string().trim().max(1000).optional(),
+  scheduledAt: z.string().optional(),
+  joinUrl: httpsUrl,
+  recordingUrl: httpsUrl,
+  sortOrder: z.coerce.number().int().positive().max(999),
+  isActive: z.boolean().default(true),
+});

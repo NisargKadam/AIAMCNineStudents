@@ -13,6 +13,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 - Self-service password changes that keep the current browser signed in and revoke every other session
 - Database-driven, categorized prerequisite checklist with search, open-only filtering, progress persistence, and configuration-version reconfirmation
 - Student profiles with photo upload, a public cohort directory with search, and AES-256-GCM encrypted OpenAI API keys
+- Sessions page for the fifteen live classes: administrators post the join link and the YouTube recording, students can open both but never edit them
 - Ten seeded, administrator-editable projects with GitHub validation, status filtering, and review lifecycle tracking
 - Community feed with text, images, external/GitHub links, likes, comments, bookmarks, saved and authored views, inline editing, ownership controls, pagination, and moderation
 - Cohort dashboard built around a three-track progress deck, the build sequence, and a derived attention list surfaced in the header
@@ -28,7 +29,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 
 The application uses Next.js App Router server components for read-heavy screens and small client components for interactive workflows. Server Actions own mutations and always derive the acting user from the secure session; clients never provide an authoritative user ID. Route handlers are limited to health and authenticated image upload.
 
-PostgreSQL is the source of truth. Prisma models users, revocable sessions, profiles, checklist configuration and completion, assignments/submissions, community activity, and audit records. Unique database constraints protect email, student/assignment submissions, likes, bookmarks, and category/order keys.
+PostgreSQL is the source of truth. Prisma models users, revocable sessions, profiles, checklist configuration and completion, live classes, assignments/submissions, community activity, and audit records. Unique database constraints protect email, student/assignment submissions, likes, bookmarks, and category/order keys.
 
 ## Technology stack
 
@@ -94,8 +95,9 @@ npm run db:seed              # repeatable admin/curriculum seed
 ## Curriculum and roster
 
 The curriculum lives in `prisma/curriculum.ts`: five readiness categories with
-twenty checks, and the ten projects (Prompt Skill, LangChain, LangGraph, RAG,
-Advanced RAG, Guardrails, MCP, MultiAgent, Memory Management, Deployment).
+twenty checks, the ten projects (Prompt Skill, LangChain, LangGraph, RAG,
+Advanced RAG, Guardrails, MCP, MultiAgent, Memory Management, Deployment), and
+fifteen session slots an administrator titles and links up in the console.
 
 `npm run db:seed` creates that curriculum on a fresh database and never
 overwrites anything an administrator has since edited in the console. When the
@@ -155,7 +157,7 @@ Students change their own password from **My Profile**. The change verifies the 
 src/
   app/                 routes, layouts, errors, health/upload handlers
   components/          design system, shell, command palette, motion primitives
-  features/            auth, dashboard, profile, prerequisites, assignments, community, students, admin
+  features/            auth, dashboard, profile, prerequisites, sessions, assignments, community, students, admin
   lib/                 database, sessions, encryption, storage, validation, policies, signals
 prisma/
   migrations/          production schema history

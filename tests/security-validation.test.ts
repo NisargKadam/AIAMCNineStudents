@@ -8,6 +8,7 @@ import {
 } from "@/lib/authorization";
 import { decryptField, encryptField, maskSecret } from "@/lib/encryption";
 import {
+  cohortSessionSchema,
   githubUrlSchema,
   loginSchema,
   postSchema,
@@ -15,6 +16,7 @@ import {
   submissionSchema,
 } from "@/lib/validation";
 import { hashSessionToken, safeEqual } from "@/lib/auth/crypto";
+import { pickNextSession } from "@/features/sessions/next-session";
 
 beforeAll(() => {
   process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -140,5 +142,73 @@ describe("assignment and community input safety", () => {
     expect(
       postSchema.safeParse({ content: "", linkUrl: "", imageUrl: "" }).success,
     ).toBe(false);
+  });
+});
+
+describe("cohort session links", () => {
+  it("accepts an https join link and a YouTube recording", () => {
+    const result = cohortSessionSchema.safeParse({
+      title: "Session 1",
+      sortOrder: 1,
+      joinUrl: "https://meet.google.com/abc-defg-hij",
+      recordingUrl: "https://www.youtube.com/watch?v=abc123",
+      isActive: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a javascript: link so an anchor can never execute it", () => {
+    const result = cohortSessionSchema.safeParse({
+      title: "Session 1",
+      sortOrder: 1,
+      joinUrl: "javascript:alert(1)",
+      isActive: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects plain http", () => {
+    const result = cohortSessionSchema.safeParse({
+      title: "Session 1",
+      sortOrder: 1,
+      recordingUrl: "http://example.com/video",
+      isActive: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("treats an empty link as no link", () => {
+    const result = cohortSessionSchema.safeParse({
+      title: "Session 1",
+      sortOrder: 1,
+      joinUrl: "",
+      recordingUrl: "",
+      isActive: true,
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("pickNextSession", () => {
+  const future = new Date(Date.now() + 86_400_000);
+  const later = new Date(Date.now() + 172_800_000);
+  const past = new Date(Date.now() - 86_400_000);
+
+  it("returns the soonest upcoming published session", () => {
+    const next = pickNextSession([
+      { isActive: true, scheduledAt: later },
+      { isActive: true, scheduledAt: future },
+      { isActive: true, scheduledAt: past },
+    ]);
+    expect(next?.scheduledAt).toBe(future);
+  });
+
+  it("ignores hidden sessions and sessions with no date", () => {
+    expect(
+      pickNextSession([
+        { isActive: false, scheduledAt: future },
+        { isActive: true, scheduledAt: null },
+      ]),
+    ).toBeNull();
   });
 });

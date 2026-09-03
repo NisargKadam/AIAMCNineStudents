@@ -234,3 +234,20 @@ model AuditLog {
   @@index([createdAt(sort: Desc)])
   @@index([entityType, entityId])
 }
+
+/// A live class in the cohort. `Session` is taken by authentication, so the
+/// teaching sessions live under their own name.
+model CohortSession {
+  id           String    @id @default(cuid())
+  sortOrder    Int       @unique
+  title        String
+  description  String?   @db.VarChar(1000)
+  scheduledAt  DateTime?
+  joinUrl      String?
+  recordingUrl String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isActive, sortOrder])
+}

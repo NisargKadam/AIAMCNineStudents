@@ -13,7 +13,7 @@
  * set SYNC_CURRICULUM=true and redeploy; the seed runs this on startup.
  */
 import { PrismaClient } from "@prisma/client";
-import { assignments, categories } from "../prisma/curriculum";
+import { assignments, categories, sessionCount } from "../prisma/curriculum";
 
 export async function syncCurriculum(prisma: PrismaClient) {
   const removed = { categories: 0, prerequisites: 0 };
@@ -88,6 +88,15 @@ export async function syncCurriculum(prisma: PrismaClient) {
     data: { isActive: false },
   });
 
+  // Sessions carry administrator-owned links, so only missing rows are added.
+  for (let sortOrder = 1; sortOrder <= sessionCount; sortOrder += 1) {
+    await prisma.cohortSession.upsert({
+      where: { sortOrder },
+      update: {},
+      create: { sortOrder, title: `Session ${sortOrder}` },
+    });
+  }
+
   const config = await prisma.prerequisiteConfig.findUnique({
     where: { id: 1 },
   });
@@ -97,7 +106,7 @@ export async function syncCurriculum(prisma: PrismaClient) {
     [
       `Curriculum synced.`,
       `  ${categories.length} categories, ${totalChecks} readiness checks`,
-      `  ${assignments.length} projects`,
+      `  ${assignments.length} projects, ${sessionCount} session slots`,
       `  removed ${removed.categories} stale categories and ${removed.prerequisites} stale checks`,
       `  hid ${hidden.count} extra projects`,
       `  checklist version is now ${config?.version ?? 1}`,

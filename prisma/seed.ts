@@ -1,6 +1,6 @@
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { assignments, categories } from "./curriculum";
+import { assignments, categories, sessionCount } from "./curriculum";
 import { importStudents } from "../scripts/import-students";
 import { syncCurriculum } from "../scripts/sync-curriculum";
 
@@ -81,6 +81,14 @@ async function main() {
     });
   }
 
+  for (let sortOrder = 1; sortOrder <= sessionCount; sortOrder += 1) {
+    await prisma.cohortSession.upsert({
+      where: { sortOrder },
+      update: {},
+      create: { sortOrder, title: `Session ${sortOrder}` },
+    });
+  }
+
   if (process.env.SEED_DEMO_DATA === "true") {
     const studentPassword = process.env.DEFAULT_STUDENT_PASSWORD;
     if (!studentPassword)
@@ -103,7 +111,7 @@ async function main() {
     });
   }
   console.log(
-    `Seed complete: 1 admin, ${categories.length} prerequisite categories, ${assignments.length} projects.`,
+    `Seed complete: 1 admin, ${categories.length} prerequisite categories, ${assignments.length} projects, ${sessionCount} sessions.`,
   );
 
   await runDeployTasks();

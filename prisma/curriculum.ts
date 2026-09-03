@@ -164,3 +164,10 @@ export const assignments = [
     "Ship the agent behind an API with configuration, logging, timeouts, retries, and a health check.",
   ],
 ] satisfies Array<readonly [string, string]>;
+
+/**
+ * Fifteen live classes. Titles are placeholders an administrator renames in
+ * the console; the seed and the sync script only ever create the missing rows,
+ * so links and edits are never overwritten.
+ */
+export const sessionCount = 15;
