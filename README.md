@@ -105,7 +105,6 @@ bumps the checklist version so students reconfirm:
 
 ```bash
 npm run db:sync-curriculum
-railway run npm run db:sync-curriculum      # against the deployed database
 ```
 
 Create accounts in bulk from a CSV with `name` and `email` columns. Rows without
@@ -114,11 +113,31 @@ left alone, so the import is safe to re-run:
 
 ```bash
 npm run db:import-students -- ./roster.csv
-railway run npm run db:import-students -- ./roster.csv
 ```
 
 Roster files hold personal data and are git-ignored. Everyone created signs in
 with `DEFAULT_STUDENT_PASSWORD`.
+
+### Running either task against a managed database
+
+On Railway the database is only reachable from inside the deployment, so both
+tasks are also available as opt-in startup steps. Set the variable, redeploy,
+check the deploy logs, then clear the variable again:
+
+| Variable                    | Effect on the next deploy                      |
+| --------------------------- | ---------------------------------------------- |
+| `SYNC_CURRICULUM=true`      | Applies `prisma/curriculum.ts` authoritatively |
+| `STUDENT_ROSTER_CSV_BASE64` | Imports the base64-encoded roster CSV          |
+
+```bash
+railway variables --set SYNC_CURRICULUM=true
+railway variables --set "STUDENT_ROSTER_CSV_BASE64=$(base64 < roster.csv | tr -d '\n')"
+# once the deploy logs show the result
+railway variables --set SYNC_CURRICULUM=false --set STUDENT_ROSTER_CSV_BASE64=
+```
+
+Both steps are safe to leave running: the import skips emails that already have
+an account, and the sync is idempotent.
 
 Production deployment uses `prisma migrate deploy`, never `db push`. The first migration lives in `prisma/migrations`.
 

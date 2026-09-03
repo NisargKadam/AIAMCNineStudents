@@ -74,3 +74,25 @@ Without all three variables, production image upload requests fail safely; text 
 - Do not rotate `FIELD_ENCRYPTION_KEY` without first re-encrypting saved fields.
 - Reset an admin password by updating `ADMIN_PASSWORD` and re-running the seed.
 - Railway supplies `PORT`; Next.js reads it automatically.
+
+## One-off maintenance
+
+The Postgres service is only reachable from inside the deployment, so the
+curriculum sync and the roster import run as opt-in startup steps instead of
+over a shell. Set the variable, redeploy, read the result in the deploy logs,
+then clear it:
+
+| Variable                    | Effect on the next deploy                      |
+| --------------------------- | ---------------------------------------------- |
+| `SYNC_CURRICULUM=true`      | Applies `prisma/curriculum.ts` authoritatively |
+| `STUDENT_ROSTER_CSV_BASE64` | Imports the base64-encoded roster CSV          |
+
+```bash
+railway variables --set SYNC_CURRICULUM=true
+railway variables --set "STUDENT_ROSTER_CSV_BASE64=$(base64 < roster.csv | tr -d '\n')"
+railway redeploy --yes
+railway logs --deployment
+railway variables --set SYNC_CURRICULUM=false --set STUDENT_ROSTER_CSV_BASE64=
+```
+
+Clear `STUDENT_ROSTER_CSV_BASE64` once it has run — it holds personal data.

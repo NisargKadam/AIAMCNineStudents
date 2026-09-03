@@ -8,14 +8,14 @@
  * curriculum, and bumps the checklist version so every student reconfirms.
  *
  *   npm run db:sync-curriculum
- *   railway run npm run db:sync-curriculum   # against the deployed database
+ *
+ * On a host where the database is only reachable from inside the deployment,
+ * set SYNC_CURRICULUM=true and redeploy; the seed runs this on startup.
  */
 import { PrismaClient } from "@prisma/client";
 import { assignments, categories } from "../prisma/curriculum";
 
-const prisma = new PrismaClient();
-
-async function main() {
+export async function syncCurriculum(prisma: PrismaClient) {
   const removed = { categories: 0, prerequisites: 0 };
   const kept: string[] = [];
 
@@ -105,9 +105,12 @@ async function main() {
   );
 }
 
-main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : "Sync failed");
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+if (process.argv[1]?.includes("sync-curriculum")) {
+  const prisma = new PrismaClient();
+  syncCurriculum(prisma)
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : "Sync failed");
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

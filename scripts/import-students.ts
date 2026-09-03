@@ -1,12 +1,15 @@
 /**
- * Bulk-creates student accounts from a CSV file.
+ * Bulk-creates student accounts from CSV text.
  *
  * The file needs a `name` and an `email` column; order and extra columns do not
  * matter. Rows without an email are reported and skipped, and an email that
  * already has an account is left untouched, so the import is safe to re-run.
  *
  *   npm run db:import-students -- ./roster.csv
- *   railway run npm run db:import-students -- ./roster.csv
+ *
+ * On a host where the database is only reachable from inside the deployment,
+ * set STUDENT_ROSTER_CSV_BASE64 to the base64 of the same file and redeploy;
+ * the seed runs this on startup. Clear the variable once it has run.
  *
  * Keep roster files out of the repository — they hold personal data.
  */
@@ -14,10 +17,8 @@ import { readFileSync } from "node:fs";
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
-
 /** Minimal CSV reader: quoted fields, doubled quotes, commas inside quotes. */
-function parseCsv(text: string): string[][] {
+export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -52,7 +53,7 @@ function parseCsv(text: string): string[][] {
 }
 
 /** Rosters arrive in mixed case; the directory reads better in one style. */
-function titleCase(name: string) {
+export function titleCase(name: string) {
   return name
     .trim()
     .replace(/\s+/g, " ")
@@ -68,15 +69,11 @@ function titleCase(name: string) {
     .join(" ");
 }
 
-async function main() {
-  const file = process.argv[2];
-  if (!file)
-    throw new Error("Pass the path to a CSV file with name and email columns.");
-
+export async function importStudents(prisma: PrismaClient, csv: string) {
   const password = process.env.DEFAULT_STUDENT_PASSWORD;
   if (!password) throw new Error("DEFAULT_STUDENT_PASSWORD is not configured.");
 
-  const rows = parseCsv(readFileSync(file, "utf8"));
+  const rows = parseCsv(csv);
   if (rows.length < 2)
     throw new Error("The file needs a header row and at least one student.");
 
@@ -144,11 +141,24 @@ async function main() {
       `\nNo email address, so no account was created (${skipped.length}): ${skipped.join(", ")}`,
     );
   console.log(`\nEveryone created signs in with DEFAULT_STUDENT_PASSWORD.`);
+
+  return { created: created.length, existing: existing.length, skipped };
 }
 
-main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : "Import failed");
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+if (process.argv[1]?.includes("import-students")) {
+  const file = process.argv[2];
+  const prisma = new PrismaClient();
+  Promise.resolve()
+    .then(() => {
+      if (!file)
+        throw new Error(
+          "Pass the path to a CSV file with name and email columns.",
+        );
+      return importStudents(prisma, readFileSync(file, "utf8"));
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : "Import failed");
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

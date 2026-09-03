@@ -1,6 +1,8 @@
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { assignments, categories } from "./curriculum";
+import { importStudents } from "../scripts/import-students";
+import { syncCurriculum } from "../scripts/sync-curriculum";
 
 const prisma = new PrismaClient();
 
@@ -101,8 +103,32 @@ async function main() {
     });
   }
   console.log(
-    `Seed complete: 1 admin, ${categories.length} prerequisite categories, 10 assignments.`,
+    `Seed complete: 1 admin, ${categories.length} prerequisite categories, ${assignments.length} projects.`,
   );
+
+  await runDeployTasks();
+}
+
+/**
+ * One-off maintenance for hosts where the database is only reachable from
+ * inside the deployment. Both tasks are opt-in and do nothing unless the
+ * corresponding variable is set, so a normal deploy is unaffected. Clear the
+ * variable once the task has run.
+ */
+async function runDeployTasks() {
+  if (process.env.SYNC_CURRICULUM === "true") {
+    console.log("SYNC_CURRICULUM is set — applying the curriculum.");
+    await syncCurriculum(prisma);
+  }
+
+  const roster = process.env.STUDENT_ROSTER_CSV_BASE64;
+  if (roster) {
+    console.log("STUDENT_ROSTER_CSV_BASE64 is set — importing students.");
+    await importStudents(
+      prisma,
+      Buffer.from(roster, "base64").toString("utf8"),
+    );
+  }
 }
 
 main()
