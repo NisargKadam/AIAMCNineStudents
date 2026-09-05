@@ -1,28 +1,41 @@
 import "server-only";
 import { v2 as cloudinary } from "cloudinary";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { db } from "@/lib/db";
+import { materialContentType, maxMaterialBytes } from "@/lib/materials";
 
-const maxBytes = 5 * 1024 * 1024;
-const accepted = new Set([
+const maxImageBytes = 5 * 1024 * 1024;
+const acceptedImages = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
 ]);
 
-export async function uploadCommunityImage(file: File) {
-  if (!accepted.has(file.type))
-    throw new Error("Use a JPEG, PNG, WebP, or GIF image.");
-  if (file.size > maxBytes)
-    throw new Error("Images must be smaller than 5 MB.");
-  const bytes = Buffer.from(await file.arrayBuffer());
-  if (
+/** Path the browser uses to fetch a file kept in the database. */
+export function storedFileUrl(id: string) {
+  return `/api/files/${id}`;
+}
+
+function cloudinaryConfigured() {
+  return Boolean(
     process.env.CLOUDINARY_CLOUD_NAME &&
     process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
-  ) {
+    process.env.CLOUDINARY_API_SECRET,
+  );
+}
+
+/**
+ * Avatars and community attachments. Cloudinary is used when configured;
+ * otherwise the image is kept in PostgreSQL, which is what the Railway
+ * deployment relies on since its filesystem does not survive a redeploy.
+ */
+export async function uploadCommunityImage(file: File, uploadedById?: string) {
+  if (!acceptedImages.has(file.type))
+    throw new Error("Use a JPEG, PNG, WebP, or GIF image.");
+  if (file.size > maxImageBytes)
+    throw new Error("Images must be smaller than 5 MB.");
+  const bytes = Buffer.from(await file.arrayBuffer());
+  if (cloudinaryConfigured()) {
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
@@ -40,14 +53,44 @@ export async function uploadCommunityImage(file: File) {
       stream.end(bytes);
     });
   }
-  if (process.env.NODE_ENV === "production")
+  const stored = await db.storedFile.create({
+    data: {
+      kind: "IMAGE",
+      fileName: file.name || "image",
+      contentType: file.type,
+      size: bytes.byteLength,
+      bytes,
+      uploadedById,
+    },
+    select: { id: true },
+  });
+  return storedFileUrl(stored.id);
+}
+
+export async function storeSessionMaterial(
+  sessionId: string,
+  file: File,
+  uploadedById: string,
+) {
+  const contentType = materialContentType(file);
+  if (!contentType)
     throw new Error(
-      "Cloudinary must be configured for production image uploads.",
+      `${file.name || "That file"} is not a slide deck, PDF, or Word document.`,
     );
-  const extension = file.type.split("/")[1].replace("jpeg", "jpg");
-  const fileName = `${randomUUID()}.${extension}`;
-  const directory = path.join(process.cwd(), "public", "uploads");
-  await mkdir(directory, { recursive: true });
-  await writeFile(path.join(directory, fileName), bytes);
-  return `/uploads/${fileName}`;
+  if (file.size > maxMaterialBytes)
+    throw new Error(`${file.name} is larger than 50 MB.`);
+  if (file.size === 0) throw new Error(`${file.name} is empty.`);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  return db.storedFile.create({
+    data: {
+      kind: "SESSION_MATERIAL",
+      fileName: file.name.slice(0, 200),
+      contentType,
+      size: bytes.byteLength,
+      bytes,
+      uploadedById,
+      sessionId,
+    },
+    select: { id: true, fileName: true, size: true, createdAt: true },
+  });
 }

@@ -238,16 +238,40 @@ model AuditLog {
 /// A live class in the cohort. `Session` is taken by authentication, so the
 /// teaching sessions live under their own name.
 model CohortSession {
-  id           String    @id @default(cuid())
-  sortOrder    Int       @unique
+  id           String       @id @default(cuid())
+  sortOrder    Int          @unique
   title        String
-  description  String?   @db.VarChar(1000)
+  description  String?      @db.VarChar(1000)
   scheduledAt  DateTime?
   joinUrl      String?
   recordingUrl String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  materials    StoredFile[]
 
   @@index([isActive, sortOrder])
+}
+
+enum StoredFileKind {
+  IMAGE
+  SESSION_MATERIAL
+}
+
+/// Binary uploads kept in the database so they survive redeploys without an
+/// object store. Images back avatars and community posts; session materials
+/// are the slides and handouts attached to a CohortSession.
+model StoredFile {
+  id           String         @id @default(cuid())
+  kind         StoredFileKind
+  fileName     String
+  contentType  String
+  size         Int
+  bytes        Bytes
+  uploadedById String?
+  sessionId    String?
+  createdAt    DateTime       @default(now())
+  session      CohortSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }

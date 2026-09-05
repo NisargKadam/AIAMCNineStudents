@@ -55,9 +55,11 @@ The repeatable seed upserts the configured admin, all prerequisite data, and ten
 
 Open `/api/health` and expect `{"status":"ok"}`. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`, open Admin Console, create a student, and verify the student can sign in using their registered email and `DEFAULT_STUDENT_PASSWORD`.
 
-## 7. Optional Cloudinary uploads
+## 7. File storage
 
-Community images require durable object storage in production. Create a Cloudinary account and set:
+Profile photos, community images, and session materials (slides, PDFs, and documents) are stored in PostgreSQL and served from `/api/files/:id` to signed-in users. No object store or volume is needed, and files survive redeploys because Railway's filesystem does not.
+
+Optionally, images can go to Cloudinary instead. Create a Cloudinary account and set all three:
 
 ```text
 CLOUDINARY_CLOUD_NAME=
@@ -65,7 +67,7 @@ CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 ```
 
-Without all three variables, production image upload requests fail safely; text and link posts continue to work. Local development falls back to `public/uploads`.
+Session materials always stay in PostgreSQL so downloads remain behind the sign-in.
 
 ## Operational notes
 

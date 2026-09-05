@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-const optionalUrl = z.union([z.literal(""), z.url().max(500)]).optional();
+const webUrl = z.url({ protocol: /^https?$/ }).max(500);
+const optionalUrl = z.union([z.literal(""), webUrl]).optional();
+/** Files kept in our own database are addressed by a relative path. */
+const storedFilePath = z
+  .string()
+  .regex(/^\/api\/files\/[a-z0-9]+$/, "Upload the file again")
+  .max(500);
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
   password: z.string().min(1).max(200),
@@ -25,7 +31,7 @@ export const profileSchema = z.object({
   country: z.string().trim().max(80).optional(),
   timezone: z.string().trim().max(100).optional(),
   bio: z.string().trim().max(500).optional(),
-  avatarUrl: optionalUrl,
+  avatarUrl: z.union([optionalUrl, storedFilePath]),
   openAiApiKey: z.string().trim().max(300).optional(),
   removeApiKey: z.boolean().optional(),
 });
@@ -47,7 +53,8 @@ export const submissionSchema = z.object({
 const imageUrl = z
   .union([
     z.literal(""),
-    z.url().max(500),
+    webUrl,
+    storedFilePath,
     z.string().startsWith("/uploads/").max(500),
   ])
   .optional();

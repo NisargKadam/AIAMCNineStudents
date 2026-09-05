@@ -18,6 +18,14 @@ import {
 import { hashSessionToken, safeEqual } from "@/lib/auth/crypto";
 import { pickNextSession } from "@/features/sessions/next-session";
 import { isoToLocalInput, localInputToIso } from "@/features/sessions/schedule";
+import {
+  formatBytes,
+  materialContentType,
+  materialType,
+} from "@/lib/materials";
+
+const acceptedPptx =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 beforeAll(() => {
   process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -264,5 +272,83 @@ describe("session scheduling across timezones", () => {
     expect(
       cohortSessionSchema.safeParse({ ...base, scheduledAt: "" }).success,
     ).toBe(true);
+  });
+});
+
+describe("stored files", () => {
+  it("accepts an avatar kept in our own database", () => {
+    const result = profileSchema.safeParse({
+      fullName: "Ada Lovelace",
+      githubUsername: "",
+      avatarUrl: "/api/files/cmf7abc123xyz",
+    });
+    expect(result.success).toBe(true);
+  });
+  it("still accepts a hosted avatar URL and an empty avatar", () => {
+    const base = { fullName: "Ada Lovelace", githubUsername: "" };
+    expect(
+      profileSchema.safeParse({
+        ...base,
+        avatarUrl: "https://res.cloudinary.com/demo/image/upload/a.jpg",
+      }).success,
+    ).toBe(true);
+    expect(profileSchema.safeParse({ ...base, avatarUrl: "" }).success).toBe(
+      true,
+    );
+  });
+  it("rejects relative paths outside the file route", () => {
+    const base = { fullName: "Ada Lovelace", githubUsername: "" };
+    for (const avatarUrl of [
+      "/api/files/../users",
+      "/api/files/",
+      "/etc/passwd",
+      "javascript:alert(1)",
+    ])
+      expect(profileSchema.safeParse({ ...base, avatarUrl }).success).toBe(
+        false,
+      );
+  });
+  it("lets a post attach a database-stored image", () => {
+    expect(
+      postSchema.safeParse({ content: "", imageUrl: "/api/files/cmf7abc" })
+        .success,
+    ).toBe(true);
+  });
+});
+
+describe("session materials", () => {
+  it("recognises slides, PDFs, and documents by MIME type", () => {
+    expect(materialContentType({ name: "deck.pptx", type: acceptedPptx })).toBe(
+      acceptedPptx,
+    );
+    expect(
+      materialContentType({ name: "notes.pdf", type: "application/pdf" }),
+    ).toBe("application/pdf");
+  });
+  it("falls back to the extension when the browser sends no type", () => {
+    expect(materialContentType({ name: "Deck.PPTX", type: "" })).toBe(
+      acceptedPptx,
+    );
+    expect(
+      materialContentType({
+        name: "handout.docx",
+        type: "application/octet-stream",
+      }),
+    ).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+  });
+  it("rejects anything that is not a slide deck, PDF, or document", () => {
+    expect(materialContentType({ name: "run.exe", type: "" })).toBeNull();
+    expect(
+      materialContentType({ name: "script.html", type: "text/html" }),
+    ).toBeNull();
+    expect(materialContentType({ name: "pdf", type: "" })).toBeNull();
+  });
+  it("labels files for the materials board", () => {
+    expect(materialType("week1.pptx").label).toBe("Slides");
+    expect(materialType("week1.pdf").label).toBe("PDF");
+    expect(materialType("week1.docx").label).toBe("Document");
+    expect(formatBytes(2_621_440)).toBe("2.5 MB");
   });
 });

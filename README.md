@@ -12,6 +12,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 - Secure email/password authentication with bcrypt, opaque revocable sessions, HTTP-only cookies, login throttling, and inactive-account enforcement
 - Self-service password changes that keep the current browser signed in and revoke every other session
 - Database-driven, categorized prerequisite checklist with search, open-only filtering, progress persistence, and configuration-version reconfirmation
+- Session materials: instructors upload slides, PDFs, and documents per session for students to download
 - Student profiles with photo upload, a public cohort directory with search, and AES-256-GCM encrypted OpenAI API keys
 - Sessions page for the fifteen live classes: administrators post the join link and the YouTube recording, students can open both but never edit them
 - Ten seeded, administrator-editable projects with GitHub validation, status filtering, and review lifecycle tracking
@@ -27,7 +28,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 
 ## Architecture
 
-The application uses Next.js App Router server components for read-heavy screens and small client components for interactive workflows. Server Actions own mutations and always derive the acting user from the secure session; clients never provide an authoritative user ID. Route handlers are limited to health and authenticated image upload.
+The application uses Next.js App Router server components for read-heavy screens and small client components for interactive workflows. Server Actions own mutations and always derive the acting user from the secure session; clients never provide an authoritative user ID. Route handlers are limited to health, authenticated uploads, and serving stored files.
 
 PostgreSQL is the source of truth. Prisma models users, revocable sessions, profiles, checklist configuration and completion, live classes, assignments/submissions, community activity, and audit records. Unique database constraints protect email, student/assignment submissions, likes, bookmarks, and category/order keys.
 
@@ -39,7 +40,7 @@ PostgreSQL is the source of truth. Prisma models users, revocable sessions, prof
 - React Hook Form-compatible actions and Zod 4 server validation
 - Prisma 6 and PostgreSQL 16/17
 - bcryptjs password hashing; Node AES-256-GCM field encryption
-- Cloudinary in production, local filesystem adapter in development
+- Files stored in PostgreSQL and served to signed-in users; optional Cloudinary adapter for images
 - Vitest, ESLint, Prettier, GitHub Actions
 
 ## Local development
@@ -64,17 +65,17 @@ If Docker is unavailable, install PostgreSQL 16+ locally, create a database/user
 
 Copy `.env.example`; never commit `.env`.
 
-| Variable                         | Purpose                                                         |
-| -------------------------------- | --------------------------------------------------------------- |
-| `DATABASE_URL`                   | PostgreSQL connection string                                    |
-| `AUTH_SECRET`                    | Authentication secret generated with `openssl rand -base64 32`  |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment               |
-| `DEFAULT_STUDENT_PASSWORD`       | Initial password assigned to admin-created students             |
-| `FIELD_ENCRYPTION_KEY`           | Exactly 32 random bytes in base64 for AES-256-GCM               |
-| `NEXT_PUBLIC_APP_NAME`           | Public product name                                             |
-| `APP_URL`                        | Canonical application URL                                       |
-| `CLOUDINARY_*`                   | Optional locally; required for durable production image uploads |
-| `SEED_DEMO_DATA`                 | Creates a demo student only when exactly `true`                 |
+| Variable                         | Purpose                                                        |
+| -------------------------------- | -------------------------------------------------------------- |
+| `DATABASE_URL`                   | PostgreSQL connection string                                   |
+| `AUTH_SECRET`                    | Authentication secret generated with `openssl rand -base64 32` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment              |
+| `DEFAULT_STUDENT_PASSWORD`       | Initial password assigned to admin-created students            |
+| `FIELD_ENCRYPTION_KEY`           | Exactly 32 random bytes in base64 for AES-256-GCM              |
+| `NEXT_PUBLIC_APP_NAME`           | Public product name                                            |
+| `APP_URL`                        | Canonical application URL                                      |
+| `CLOUDINARY_*`                   | Optional; sends images to Cloudinary instead of PostgreSQL     |
+| `SEED_DEMO_DATA`                 | Creates a demo student only when exactly `true`                |
 
 Generate secrets:
 

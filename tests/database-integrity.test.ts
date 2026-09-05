@@ -77,7 +77,58 @@ afterAll(async () => {
   await db.prerequisiteCategory.deleteMany({
     where: { name: { startsWith: suite } },
   });
+  await db.cohortSession.deleteMany({
+    where: { title: { startsWith: suite } },
+  });
   await db.$disconnect();
+});
+
+describe("stored files", () => {
+  it("keeps image bytes and serves them back intact", async () => {
+    const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    const file = await db.storedFile.create({
+      data: {
+        kind: "IMAGE",
+        fileName: `${suite}.jpg`,
+        contentType: "image/jpeg",
+        size: bytes.byteLength,
+        bytes,
+        uploadedById: studentA,
+      },
+    });
+    const read = await db.storedFile.findUniqueOrThrow({
+      where: { id: file.id },
+    });
+    expect(Buffer.from(read.bytes).equals(bytes)).toBe(true);
+    await db.storedFile.delete({ where: { id: file.id } });
+  });
+  it("removes a session's materials when the session is deleted", async () => {
+    const max = await db.cohortSession.aggregate({ _max: { sortOrder: true } });
+    const session = await db.cohortSession.create({
+      data: {
+        title: `${suite} session`,
+        sortOrder: (max._max.sortOrder ?? 0) + 100,
+      },
+    });
+    await db.storedFile.createMany({
+      data: ["a.pptx", "b.pdf"].map((fileName) => ({
+        kind: "SESSION_MATERIAL" as const,
+        fileName,
+        contentType: "application/pdf",
+        size: 3,
+        bytes: Buffer.from("abc"),
+        uploadedById: admin,
+        sessionId: session.id,
+      })),
+    });
+    expect(
+      await db.storedFile.count({ where: { sessionId: session.id } }),
+    ).toBe(2);
+    await db.cohortSession.delete({ where: { id: session.id } });
+    expect(
+      await db.storedFile.count({ where: { sessionId: session.id } }),
+    ).toBe(0);
+  });
 });
 
 describe("database integrity and workflows", () => {

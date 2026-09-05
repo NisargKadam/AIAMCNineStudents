@@ -2,6 +2,7 @@ import {
   BookOpenCheck,
   CalendarDays,
   ClipboardCheck,
+  FolderOpen,
   GraduationCap,
   Info,
   LayoutDashboard,
@@ -42,6 +43,12 @@ export const navSections: NavSection[] = [
         label: "Sessions",
         icon: CalendarDays,
         hint: "Join links and session recordings",
+      },
+      {
+        href: "/materials",
+        label: "Materials",
+        icon: FolderOpen,
+        hint: "Slides and handouts per session",
       },
       {
         href: "/prerequisites",

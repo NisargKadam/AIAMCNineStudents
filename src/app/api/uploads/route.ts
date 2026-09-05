@@ -3,13 +3,13 @@ import { requireUser } from "@/lib/auth/session";
 import { uploadCommunityImage } from "@/lib/storage";
 
 export async function POST(request: Request) {
-  await requireUser();
+  const user = await requireUser();
   try {
     const formData = await request.formData();
     const file = formData.get("file");
     if (!(file instanceof File))
       return NextResponse.json({ error: "Select an image." }, { status: 400 });
-    const url = await uploadCommunityImage(file);
+    const url = await uploadCommunityImage(file, user.id);
     return NextResponse.json({ url });
   } catch (error) {
     return NextResponse.json(
