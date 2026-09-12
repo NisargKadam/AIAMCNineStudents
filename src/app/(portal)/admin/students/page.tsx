@@ -18,7 +18,9 @@ export default async function AdminStudentsPage() {
             prerequisite: { isActive: true, category: { isActive: true } },
           },
         },
-        submissions: { where: { status: "COMPLETED" } },
+        submissions: {
+          select: { status: true, assignment: { select: { isActive: true } } },
+        },
       },
     }),
     db.prerequisite.count({
@@ -49,7 +51,12 @@ export default async function AdminStudentsPage() {
           joinedAt: user.createdAt.toISOString(),
           prereqDone: user.prerequisites.length,
           prereqTotal,
-          assignmentDone: user.submissions.length,
+          assignmentDone: user.submissions.filter(
+            (submission) =>
+              submission.status === "COMPLETED" &&
+              submission.assignment.isActive,
+          ).length,
+          submissionCount: user.submissions.length,
           assignmentTotal,
         }))}
       />

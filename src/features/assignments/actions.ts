@@ -48,6 +48,7 @@ export async function submitAssignmentAction(input: unknown) {
   });
   revalidatePath("/assignments");
   revalidatePath("/dashboard");
+  revalidatePath("/admin", "layout");
   return { success: "Assignment submitted successfully." };
 }
 
@@ -73,6 +74,7 @@ export async function upsertAssignmentAction(input: unknown) {
     { title: assignment.title },
   );
   revalidatePath("/admin/assignments");
+  revalidatePath("/admin", "layout");
   revalidatePath("/assignments");
   return { success: true };
 }
@@ -82,6 +84,7 @@ export async function deleteAssignmentAction(id: string) {
   await db.assignment.delete({ where: { id } });
   await audit(admin.id, "assignment_deleted", "Assignment", id);
   revalidatePath("/admin/assignments");
+  revalidatePath("/admin", "layout");
   return { success: true };
 }
 
@@ -106,7 +109,8 @@ export async function reviewSubmissionAction(input: unknown) {
     updated.id,
     { status: updated.status },
   );
-  revalidatePath("/admin");
-  revalidatePath("/admin/students");
+  revalidatePath("/admin", "layout");
+  revalidatePath("/assignments");
+  revalidatePath("/dashboard");
   return { success: true };
 }

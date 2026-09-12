@@ -11,6 +11,7 @@ import {
   Minus,
 } from "lucide-react";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ export default async function StudentRecordPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireAdmin();
   const { id } = await params;
   const requested = (await searchParams).tab;
   const tab: Tab = TABS.includes(requested as Tab)
@@ -80,7 +82,9 @@ export default async function StudentRecordPage({
       },
     }),
     db.assignment.findMany({
-      where: { isActive: true },
+      where: {
+        OR: [{ isActive: true }, { submissions: { some: { userId: id } } }],
+      },
       orderBy: { sortOrder: "asc" },
     }),
     db.auditLog.findMany({
@@ -384,6 +388,9 @@ export default async function StudentRecordPage({
                       <h2 className="font-display text-ink text-sm font-semibold">
                         {assignment.title}
                       </h2>
+                      {!assignment.isActive && (
+                        <Badge tone="neutral">Hidden assignment</Badge>
+                      )}
                       {submission ? (
                         <p className="text-faint mt-1 text-[11px]">
                           Submitted{" "}

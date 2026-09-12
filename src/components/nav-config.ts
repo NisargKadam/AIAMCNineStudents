@@ -110,6 +110,12 @@ export const navSections: NavSection[] = [
         hint: "Add, edit, inspect, or remove accounts",
       },
       {
+        href: "/admin/submissions",
+        label: "Submissions",
+        icon: ClipboardCheck,
+        hint: "View and review all student submissions",
+      },
+      {
         href: "/admin/assignments",
         label: "Curriculum",
         icon: ClipboardCheck,

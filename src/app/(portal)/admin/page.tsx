@@ -180,7 +180,7 @@ export default async function AdminPage() {
               Latest submissions
             </h2>
             <Link
-              href="/admin/students"
+              href="/admin/submissions"
               className="text-dim hover:text-ink flex items-center gap-1 text-xs transition-colors"
             >
               Open student management

@@ -50,6 +50,7 @@ export type ManagedStudent = {
   prereqDone: number;
   prereqTotal: number;
   assignmentDone: number;
+  submissionCount: number;
   assignmentTotal: number;
 };
 
@@ -371,19 +372,29 @@ export function StudentManager({
                         100
                       }
                     />
-                    <Progress
-                      tone={
-                        student.assignmentDone === student.assignmentTotal
-                          ? "verified"
-                          : "ember"
-                      }
-                      label={`Assignments ${student.assignmentDone}/${student.assignmentTotal}`}
-                      value={
-                        (student.assignmentDone /
-                          Math.max(student.assignmentTotal, 1)) *
-                        100
-                      }
-                    />
+                    <div>
+                      <Progress
+                        tone={
+                          student.assignmentDone === student.assignmentTotal
+                            ? "verified"
+                            : "ember"
+                        }
+                        label={`Approved ${student.assignmentDone}/${student.assignmentTotal}`}
+                        value={
+                          (student.assignmentDone /
+                            Math.max(student.assignmentTotal, 1)) *
+                          100
+                        }
+                      />
+                      <Link
+                        href={`/admin/students/${student.id}?tab=assignments`}
+                        className="text-ember mt-2 inline-flex text-xs hover:underline"
+                      >
+                        {student.submissionCount}{" "}
+                        {pluralize(student.submissionCount, "submission")} ·
+                        View assignments
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1 xl:justify-end">
