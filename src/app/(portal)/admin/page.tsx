@@ -183,7 +183,7 @@ export default async function AdminPage() {
               href="/admin/submissions"
               className="text-dim hover:text-ink flex items-center gap-1 text-xs transition-colors"
             >
-              Open student management
+              View all submissions
               <ArrowUpRight size={13} />
             </Link>
           </div>
