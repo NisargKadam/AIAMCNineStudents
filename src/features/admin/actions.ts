@@ -47,7 +47,44 @@ export async function createStudentAction(input: unknown) {
   const existing = await db.user.findUnique({
     where: { email: parsed.data.email },
   });
-  if (existing) return { error: "That email already belongs to an account." };
+  if (existing) {
+    if (existing.role === Role.ADMIN)
+      return {
+        error:
+          "That email belongs to an administrator. Update it from My Profile.",
+      };
+
+    await db.$transaction([
+      db.user.update({
+        where: { id: existing.id },
+        data: {
+          passwordHash: await bcrypt.hash(password, 12),
+          isActive: true,
+          profile: {
+            upsert: {
+              create: {
+                fullName: parsed.data.fullName,
+                githubUsername: parsed.data.githubUsername || null,
+              },
+              update: {
+                fullName: parsed.data.fullName,
+                githubUsername: parsed.data.githubUsername || null,
+              },
+            },
+          },
+        },
+      }),
+      db.session.deleteMany({ where: { userId: existing.id } }),
+    ]);
+    await audit(admin.id, "student_access_recovered", "User", existing.id, {
+      email: existing.email,
+      customPassword: Boolean(parsed.data.password),
+    });
+    refreshStudentViews(existing.id);
+    return {
+      success: `${parsed.data.fullName}'s access was updated. Their existing submissions and progress were kept.`,
+    };
+  }
 
   const user = await db.user.create({
     data: {

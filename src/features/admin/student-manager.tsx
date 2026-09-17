@@ -9,7 +9,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Shield,
   Trash2,
   UserCheck,
   UserPlus,
@@ -18,7 +17,6 @@ import {
 import { toast } from "sonner";
 import {
   bulkStudentAction,
-  changeStudentRoleAction,
   createStudentAction,
   deleteStudentAction,
   resetStudentPasswordAction,
@@ -34,12 +32,11 @@ import { Progress } from "@/components/ui/progress";
 import { Confirm, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/avatar";
-import { cn, pluralize } from "@/lib/utils";
+import { pluralize } from "@/lib/utils";
 
 export type ManagedStudent = {
   id: string;
   email: string;
-  role: "ADMIN" | "STUDENT";
   isActive: boolean;
   name: string;
   avatarUrl: string | null;
@@ -49,23 +46,17 @@ export type ManagedStudent = {
   joinedAt: string;
   prereqDone: number;
   prereqTotal: number;
-  assignmentDone: number;
-  submissionCount: number;
+  approvedCount: number;
+  submittedCount: number;
+  awaitingReviewCount: number;
   assignmentTotal: number;
 };
 
 type Result = { error?: string; success?: unknown };
 type Sort = "recent" | "name" | "progress";
 
-export function StudentManager({
-  students,
-  currentAdminId,
-}: {
-  students: ManagedStudent[];
-  currentAdminId: string;
-}) {
+export function StudentManager({ students }: { students: ManagedStudent[] }) {
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState<"all" | "ADMIN" | "STUDENT">("all");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -90,7 +81,6 @@ export function StudentManager({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = students.filter((student) => {
-      if (role !== "all" && student.role !== role) return false;
       if (status === "active" && !student.isActive) return false;
       if (status === "inactive" && student.isActive) return false;
       if (!q) return true;
@@ -108,13 +98,13 @@ export function StudentManager({
     });
     const progress = (s: ManagedStudent) =>
       s.prereqDone / Math.max(s.prereqTotal, 1) +
-      s.assignmentDone / Math.max(s.assignmentTotal, 1);
+      s.submittedCount / Math.max(s.assignmentTotal, 1);
     return [...list].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name);
       if (sort === "progress") return progress(b) - progress(a);
       return b.joinedAt.localeCompare(a.joinedAt);
     });
-  }, [students, query, role, status, sort]);
+  }, [students, query, status, sort]);
 
   const selectedList = filtered.filter((student) => selected.has(student.id));
   const allVisibleSelected =
@@ -133,13 +123,13 @@ export function StudentManager({
     const header = [
       "name",
       "email",
-      "role",
       "active",
       "github",
       "current_role",
       "country",
       "prerequisites_done",
       "prerequisites_total",
+      "assignments_submitted",
       "assignments_approved",
       "assignments_total",
       "joined_at",
@@ -148,14 +138,14 @@ export function StudentManager({
       [
         s.name,
         s.email,
-        s.role,
         s.isActive ? "yes" : "no",
         s.githubUsername ?? "",
         s.currentRole ?? "",
         s.country ?? "",
         s.prereqDone,
         s.prereqTotal,
-        s.assignmentDone,
+        s.submittedCount,
+        s.approvedCount,
         s.assignmentTotal,
         s.joinedAt,
       ]
@@ -178,7 +168,7 @@ export function StudentManager({
 
   return (
     <>
-      <div className="mb-4 grid gap-2 lg:grid-cols-[1fr_auto_auto_auto_auto]">
+      <div className="mb-4 grid gap-2 lg:grid-cols-[1fr_auto_auto_auto]">
         <div className="relative">
           <Search
             size={15}
@@ -192,15 +182,6 @@ export function StudentManager({
             aria-label="Search students"
           />
         </div>
-        <Select
-          aria-label="Filter by role"
-          value={role}
-          onChange={(event) => setRole(event.target.value as typeof role)}
-        >
-          <option value="all">All roles</option>
-          <option value="STUDENT">Students</option>
-          <option value="ADMIN">Administrators</option>
-        </Select>
         <Select
           aria-label="Filter by status"
           value={status}
@@ -242,7 +223,7 @@ export function StudentManager({
           Select all shown
         </label>
         <span className="text-faint num text-xs">
-          {filtered.length} of {students.length} accounts
+          {filtered.length} of {students.length} students
         </span>
         <Button
           variant="ghost"
@@ -322,7 +303,6 @@ export function StudentManager({
       {filtered.length ? (
         <div className="space-y-2.5">
           {filtered.map((student) => {
-            const isSelf = student.id === currentAdminId;
             return (
               <Card key={student.id} className="p-4">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
@@ -347,13 +327,9 @@ export function StudentManager({
                         {student.email}
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {student.role === "ADMIN" && (
-                          <Badge tone="ember">Admin</Badge>
-                        )}
                         {!student.isActive && (
                           <Badge tone="alert">Inactive</Badge>
                         )}
-                        {isSelf && <Badge tone="halo">You</Badge>}
                       </div>
                     </div>
                   </div>
@@ -375,13 +351,13 @@ export function StudentManager({
                     <div>
                       <Progress
                         tone={
-                          student.assignmentDone === student.assignmentTotal
+                          student.submittedCount === student.assignmentTotal
                             ? "verified"
                             : "ember"
                         }
-                        label={`Approved ${student.assignmentDone}/${student.assignmentTotal}`}
+                        label={`Submitted ${student.submittedCount}/${student.assignmentTotal}`}
                         value={
-                          (student.assignmentDone /
+                          (student.submittedCount /
                             Math.max(student.assignmentTotal, 1)) *
                           100
                         }
@@ -390,9 +366,10 @@ export function StudentManager({
                         href={`/admin/students/${student.id}?tab=assignments`}
                         className="text-ember mt-2 inline-flex text-xs hover:underline"
                       >
-                        {student.submissionCount}{" "}
-                        {pluralize(student.submissionCount, "submission")} ·
-                        View assignments
+                        {student.approvedCount} approved
+                        {student.awaitingReviewCount > 0 &&
+                          ` · ${student.awaitingReviewCount} awaiting review`}{" "}
+                        · View projects
                       </Link>
                     </div>
                   </div>
@@ -419,28 +396,7 @@ export function StudentManager({
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      disabled={pending || isSelf}
-                      title={
-                        student.role === "ADMIN"
-                          ? "Change to student"
-                          : "Promote to administrator"
-                      }
-                      aria-label={`Change role for ${student.name}`}
-                      onClick={() =>
-                        run(() =>
-                          changeStudentRoleAction(
-                            student.id,
-                            student.role === "ADMIN" ? "STUDENT" : "ADMIN",
-                          ),
-                        )
-                      }
-                    >
-                      <Shield size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={pending || isSelf}
+                      disabled={pending}
                       title={student.isActive ? "Deactivate" : "Activate"}
                       aria-label={`${student.isActive ? "Deactivate" : "Activate"} ${student.name}`}
                       onClick={() =>
@@ -458,10 +414,10 @@ export function StudentManager({
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      disabled={pending || isSelf}
+                      disabled={pending}
                       title="Delete account"
                       aria-label={`Delete ${student.name}`}
-                      className={cn(!isSelf && "hover:text-[var(--alert)]")}
+                      className="hover:text-[var(--alert)]"
                       onClick={() => setDeleting(student)}
                     >
                       <Trash2 size={14} />
@@ -490,8 +446,8 @@ export function StudentManager({
       <Modal
         open={adding}
         onOpenChange={setAdding}
-        title="Add a student"
-        description="They sign in with this email. Leave the password blank to use the cohort default."
+        title="Add or recover a student"
+        description="A new email creates an account. An existing student email updates access while keeping submissions and progress."
       >
         <form
           className="space-y-4"
@@ -551,7 +507,7 @@ export function StudentManager({
             </Button>
             <Button type="submit" disabled={pending}>
               {pending && <LoaderCircle size={15} className="animate-spin" />}
-              Create account
+              Save student access
             </Button>
           </div>
         </form>

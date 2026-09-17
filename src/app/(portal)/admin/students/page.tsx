@@ -6,9 +6,10 @@ import { StudentManager } from "@/features/admin/student-manager";
 export const metadata = { title: "Manage students" };
 
 export default async function AdminStudentsPage() {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const [users, prereqTotal, assignmentTotal] = await Promise.all([
     db.user.findMany({
+      where: { role: "STUDENT" },
       orderBy: { createdAt: "desc" },
       include: {
         profile: true,
@@ -37,11 +38,9 @@ export default async function AdminStudentsPage() {
         description="Add accounts, edit details, control access, set passwords, and remove people who are no longer in the cohort."
       />
       <StudentManager
-        currentAdminId={admin.id}
         students={users.map((user) => ({
           id: user.id,
           email: user.email,
-          role: user.role,
           isActive: user.isActive,
           name: user.profile?.fullName ?? user.email,
           avatarUrl: user.profile?.avatarUrl ?? null,
@@ -51,12 +50,19 @@ export default async function AdminStudentsPage() {
           joinedAt: user.createdAt.toISOString(),
           prereqDone: user.prerequisites.length,
           prereqTotal,
-          assignmentDone: user.submissions.filter(
+          approvedCount: user.submissions.filter(
             (submission) =>
               submission.status === "COMPLETED" &&
               submission.assignment.isActive,
           ).length,
-          submissionCount: user.submissions.length,
+          submittedCount: user.submissions.filter(
+            (submission) => submission.assignment.isActive,
+          ).length,
+          awaitingReviewCount: user.submissions.filter(
+            (submission) =>
+              submission.status === "SUBMITTED" &&
+              submission.assignment.isActive,
+          ).length,
           assignmentTotal,
         }))}
       />

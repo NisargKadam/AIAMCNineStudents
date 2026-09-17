@@ -69,6 +69,16 @@ function PasswordCard() {
             required
           />
         </Field>
+        <Field label="Confirm new password" htmlFor="confirmPassword">
+          <Input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            minLength={12}
+            required
+          />
+        </Field>
         <Button type="submit" variant="secondary" disabled={pending}>
           {pending && <LoaderCircle size={15} className="animate-spin" />}
           Change password

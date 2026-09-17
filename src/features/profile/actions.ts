@@ -75,6 +75,7 @@ export async function changeOwnPasswordAction(_: unknown, formData: FormData) {
   const parsed = passwordChangeSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success)
     return { error: parsed.error.issues[0]?.message ?? "Check both fields." };
@@ -91,5 +92,6 @@ export async function changeOwnPasswordAction(_: unknown, formData: FormData) {
   });
   await revokeOtherSessions(user.id);
   await audit(user.id, "password_changed", "User", user.id);
+  revalidatePath("/profile");
   return { success: "Password changed. Other devices were signed out." };
 }

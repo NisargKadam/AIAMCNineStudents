@@ -1,7 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import bcrypt from "bcryptjs";
+import { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
+import { createStudentAction } from "@/features/admin/actions";
 import SubmissionsPage from "@/app/(portal)/admin/submissions/page";
 import StudentRecordPage from "@/app/(portal)/admin/students/[id]/page";
 import AdminStudentsPage from "@/app/(portal)/admin/students/page";
@@ -9,6 +12,7 @@ import AdminStudentsPage from "@/app/(portal)/admin/students/page";
 vi.mock("@/lib/auth/session", () => ({
   requireAdmin: vi.fn().mockResolvedValue({ id: "test-admin" }),
 }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/features/admin/review-submission", () => ({
   ReviewSubmission: () => "Review controls",
 }));
@@ -19,17 +23,30 @@ vi.mock("@/features/admin/student-manager", () => ({
 
 const suite = `submission-view-${Date.now()}`;
 let studentId = "";
+let adminId = "";
 let hiddenTitle = "";
 
 beforeAll(async () => {
-  const student = await db.user.create({
-    data: {
-      email: `${suite}@example.test`,
-      passwordHash: "unused-test-fixture",
-      profile: { create: { fullName: suite } },
-    },
-  });
+  const [student, admin] = await Promise.all([
+    db.user.create({
+      data: {
+        email: `${suite}@example.test`,
+        passwordHash: "unused-test-fixture",
+        profile: { create: { fullName: suite } },
+      },
+    }),
+    db.user.create({
+      data: {
+        email: `${suite}-admin@example.test`,
+        passwordHash: "unused-test-fixture",
+        role: Role.ADMIN,
+        profile: { create: { fullName: `${suite} administrator` } },
+      },
+    }),
+  ]);
   studentId = student.id;
+  adminId = admin.id;
+  vi.mocked(requireAdmin).mockResolvedValue({ id: adminId } as never);
   const max = await db.assignment.aggregate({ _max: { sortOrder: true } });
   for (const [index, isActive] of [true, false].entries()) {
     const title = `${suite} ${isActive ? "active" : "hidden"}`;
@@ -52,7 +69,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.user.deleteMany({ where: { email: `${suite}@example.test` } });
+  await db.user.deleteMany({ where: { email: { startsWith: suite } } });
   await db.assignment.deleteMany({ where: { title: { startsWith: suite } } });
   await db.$disconnect();
 });
@@ -80,13 +97,60 @@ describe("admin submission views", () => {
     );
     expect(html).toContain(hiddenTitle);
     expect(html).toContain(`https://github.com/test/${suite}-1`);
+    const activeTotal = await db.assignment.count({
+      where: { isActive: true },
+    });
+    const overview = renderToStaticMarkup(
+      await StudentRecordPage({
+        params: Promise.resolve({ id: studentId }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    expect(overview).toContain(`Projects submitted 1/${activeTotal}`);
   });
 
-  it("reports submissions separately from approvals in the roster", async () => {
+  it("reports submitted, approved, and awaiting-review counts in the roster", async () => {
     const html = renderToStaticMarkup(await AdminStudentsPage());
     expect(html).toContain(
-      "&quot;assignmentDone&quot;:0,&quot;submissionCount&quot;:2",
+      "&quot;approvedCount&quot;:0,&quot;submittedCount&quot;:1,&quot;awaitingReviewCount&quot;:1",
     );
+    expect(html).not.toContain(`${suite}-admin@example.test`);
+  });
+
+  it("recovers an existing student login without losing submitted work", async () => {
+    await db.user.update({
+      where: { id: studentId },
+      data: { isActive: false },
+    });
+    await db.session.create({
+      data: {
+        userId: studentId,
+        tokenHash: `${suite}-session`,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    const result = await createStudentAction({
+      fullName: `${suite} recovered`,
+      email: `${suite}@example.test`,
+      githubUsername: "recovered-student",
+      password: "RecoveredPass123",
+    });
+    const recovered = await db.user.findUniqueOrThrow({
+      where: { id: studentId },
+      include: { profile: true, submissions: true, sessions: true },
+    });
+
+    expect(result.success).toContain(
+      "existing submissions and progress were kept",
+    );
+    expect(recovered.isActive).toBe(true);
+    expect(recovered.profile?.fullName).toBe(`${suite} recovered`);
+    expect(recovered.submissions).toHaveLength(2);
+    expect(recovered.sessions).toHaveLength(0);
+    expect(
+      await bcrypt.compare("RecoveredPass123", recovered.passwordHash),
+    ).toBe(true);
   });
 
   it("distinguishes an empty filtered result from no submissions", async () => {

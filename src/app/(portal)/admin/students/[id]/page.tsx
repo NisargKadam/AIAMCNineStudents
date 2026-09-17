@@ -46,7 +46,7 @@ export default async function StudentRecordPage({
 
   const [user, categories, assignments, auditLog] = await Promise.all([
     db.user.findUnique({
-      where: { id },
+      where: { id, role: "STUDENT" },
       include: {
         profile: true,
         prerequisiteConfirmation: true,
@@ -112,11 +112,19 @@ export default async function StudentRecordPage({
   const submissionsByAssignment = new Map(
     user.submissions.map((submission) => [submission.assignmentId, submission]),
   );
-  const approved = user.submissions.filter(
+  const activeAssignments = assignments.filter(
+    (assignment) => assignment.isActive,
+  );
+  const activeSubmissions = user.submissions.filter(
+    (submission) => submission.assignment.isActive,
+  );
+  const submitted = activeSubmissions.length;
+  const approved = activeSubmissions.filter(
     (submission) => submission.status === "COMPLETED",
   ).length;
   const awaitingReview = user.submissions.filter(
-    (submission) => submission.status === "SUBMITTED",
+    (submission) =>
+      submission.status === "SUBMITTED" && submission.assignment.isActive,
   ).length;
 
   const profileFields = [
@@ -133,7 +141,7 @@ export default async function StudentRecordPage({
   );
   const overall = Math.round(
     (percentage(prereqDone, prereqTotal) +
-      percentage(approved, assignments.length) +
+      percentage(submitted, activeAssignments.length) +
       profilePercent) /
       3,
   );
@@ -266,9 +274,13 @@ export default async function StudentRecordPage({
                   tone={prereqDone === prereqTotal ? "verified" : "ember"}
                 />
                 <Progress
-                  label={`Assignments approved ${approved}/${assignments.length}`}
-                  value={percentage(approved, assignments.length)}
-                  tone={approved === assignments.length ? "verified" : "ember"}
+                  label={`Projects submitted ${submitted}/${activeAssignments.length}`}
+                  value={percentage(submitted, activeAssignments.length)}
+                  tone={
+                    submitted === activeAssignments.length
+                      ? "verified"
+                      : "ember"
+                  }
                 />
                 <Progress
                   label="Profile completeness"
@@ -279,10 +291,10 @@ export default async function StudentRecordPage({
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: "Posts", value: user._count.posts },
-                { label: "Comments", value: user._count.comments },
-                { label: "Submissions", value: user.submissions.length },
-                { label: "Active sessions", value: user._count.sessions },
+                { label: "Submitted", value: submitted },
+                { label: "Approved", value: approved },
+                { label: "Awaiting review", value: awaitingReview },
+                { label: "Community posts", value: user._count.posts },
               ].map((stat) => (
                 <div
                   key={stat.label}

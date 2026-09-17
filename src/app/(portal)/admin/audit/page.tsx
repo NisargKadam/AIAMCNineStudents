@@ -19,6 +19,7 @@ const notable = new Set([
   "role_changed",
   "password_reset",
   "password_set_by_admin",
+  "student_access_recovered",
   "post_moderated",
   "comment_moderated",
 ]);

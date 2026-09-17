@@ -108,17 +108,23 @@ export const reviewSchema = z.object({
   status: z.enum(["REVIEWED", "NEEDS_CHANGES", "COMPLETED"]),
   feedback: z.string().trim().max(2000).optional(),
 });
-export const passwordChangeSchema = z.object({
-  currentPassword: z.string().min(1).max(200),
-  newPassword: z
-    .string()
-    .min(12, "Use at least 12 characters")
-    .max(200)
-    .refine(
-      (value) => /[a-z]/i.test(value) && /\d/.test(value),
-      "Include at least one letter and one number",
-    ),
-});
+export const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(200),
+    newPassword: z
+      .string()
+      .min(12, "Use at least 12 characters")
+      .max(200)
+      .refine(
+        (value) => /[a-z]/i.test(value) && /\d/.test(value),
+        "Include at least one letter and one number",
+      ),
+    confirmPassword: z.string().min(1, "Confirm your new password").max(200),
+  })
+  .refine((value) => value.newPassword === value.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "The new passwords do not match",
+  });
 export const studentUpdateSchema = z.object({
   userId: z.string().min(1),
   fullName: z.string().trim().min(2).max(100),

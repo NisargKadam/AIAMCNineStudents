@@ -11,6 +11,7 @@ import {
   cohortSessionSchema,
   githubUrlSchema,
   loginSchema,
+  passwordChangeSchema,
   postSchema,
   profileSchema,
   submissionSchema,
@@ -45,6 +46,22 @@ describe("authentication and authorization", () => {
       loginSchema.parse({ email: " STUDENT@Example.COM ", password: "secret" })
         .email,
     ).toBe("student@example.com");
+  });
+  it("requires matching new passwords", () => {
+    expect(
+      passwordChangeSchema.safeParse({
+        currentPassword: "current-password",
+        newPassword: "NewPassword123",
+        confirmPassword: "DifferentPass123",
+      }).success,
+    ).toBe(false);
+    expect(
+      passwordChangeSchema.safeParse({
+        currentPassword: "current-password",
+        newPassword: "NewPassword123",
+        confirmPassword: "NewPassword123",
+      }).success,
+    ).toBe(true);
   });
   it("blocks students and allows admins in the policy used by the admin guard", () => {
     expect(canAccessAdmin(Role.STUDENT)).toBe(false);
