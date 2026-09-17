@@ -189,7 +189,7 @@ GitHub Actions provisions PostgreSQL 17 and runs install, client generation, mig
 - Sessions use random opaque tokens; only SHA-256 token hashes are stored.
 - Cookies are HTTP-only, `SameSite=Lax`, path-scoped, and `Secure` in production.
 - Next.js Server Actions provide same-origin mutation transport; every action repeats authorization and Zod validation on the server.
-- OpenAI API keys are AES-256-GCM encrypted at rest, returned only as a last-four mask, and never logged or audited.
+- OpenAI API keys are AES-256-GCM encrypted at rest, decrypted only into the authenticated owner's profile for viewing and copying, and never logged or audited.
 - Ownership rules prevent cross-student profile, submission, post, and comment mutations.
 - Community content is rendered as text without arbitrary HTML; external links use `noopener noreferrer`.
 - Login attempts are rate limited per forwarded IP/email key.

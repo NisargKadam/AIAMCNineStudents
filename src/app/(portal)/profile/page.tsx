@@ -1,11 +1,20 @@
 import { requireUser } from "@/lib/auth/session";
-import { maskSecret } from "@/lib/encryption";
+import { decryptField } from "@/lib/encryption";
 import { PageHeader } from "@/components/page-header";
 import { ProfileForm } from "@/features/profile/profile-form";
 export const metadata = { title: "My Profile" };
 export default async function ProfilePage() {
   const user = await requireUser();
   const p = user.profile;
+  let apiKey = "";
+  if (p?.encryptedOpenAiApiKey) {
+    try {
+      apiKey = decryptField(p.encryptedOpenAiApiKey);
+    } catch {
+      // Keep the profile usable if an old key cannot be decrypted. Saving an
+      // empty field leaves the stored value untouched unless Remove is chosen.
+    }
+  }
   return (
     <>
       <PageHeader
@@ -15,7 +24,7 @@ export default async function ProfilePage() {
       />
       <ProfileForm
         email={user.email}
-        maskedKey={maskSecret(p?.openAiKeyLastFour ?? null)}
+        apiKey={apiKey}
         profile={{
           fullName: p?.fullName ?? "",
           githubUsername: p?.githubUsername ?? "",

@@ -2,6 +2,9 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
   CircleCheckBig,
+  Copy,
+  Eye,
+  EyeOff,
   ExternalLink,
   Code2,
   ImagePlus,
@@ -91,7 +94,7 @@ function PasswordCard() {
 export function ProfileForm({
   email,
   profile,
-  maskedKey,
+  apiKey: storedApiKey,
 }: {
   email: string;
   profile: {
@@ -104,13 +107,15 @@ export function ProfileForm({
     bio: string;
     avatarUrl: string;
   };
-  maskedKey: string | null;
+  apiKey: string;
 }) {
   const [state, action, pending] = useActionState(updateProfileAction, null);
   const [name, setName] = useState(profile.fullName);
   const [github, setGithub] = useState(profile.githubUsername);
   const [avatar, setAvatar] = useState(profile.avatarUrl);
   const [uploading, setUploading] = useState(false);
+  const [apiKey, setApiKey] = useState(storedApiKey);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [removeKey, setRemoveKey] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -140,6 +145,16 @@ export function ProfileForm({
       );
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function copyApiKey() {
+    if (!apiKey) return;
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast.success("API key copied.");
+    } catch {
+      toast.error("Could not copy the API key. Select it and copy manually.");
     }
   }
 
@@ -326,66 +341,96 @@ export function ProfileForm({
                 OpenAI API key
               </h2>
               <p className="text-dim mt-1 text-xs leading-5">
-                Encrypted at rest with AES-256-GCM. It is never shown again
-                after you save it.
+                View, copy, or replace your key anytime. It stays encrypted in
+                the database and is only shown on your signed-in profile.
               </p>
             </div>
           </div>
 
-          {maskedKey && !removeKey ? (
-            <div className="mt-5 rounded-xl border border-[color-mix(in_oklab,var(--verified)_25%,transparent)] bg-[color-mix(in_oklab,var(--verified)_8%,transparent)] p-4">
-              <Badge tone="verified">
-                <CircleCheckBig size={12} />
-                Stored
-              </Badge>
-              <code className="text-dim mt-3 block font-mono text-xs break-all">
-                {maskedKey}
-              </code>
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-ink text-xs font-semibold">
+                {storedApiKey ? "Saved key" : "Add a key"}
+              </p>
+              {storedApiKey && !removeKey && (
+                <Badge tone="verified">
+                  <CircleCheckBig size={12} />
+                  Stored
+                </Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Input
+                  id="openAiApiKey"
+                  name="openAiApiKey"
+                  form="profile-form"
+                  type={showApiKey ? "text" : "password"}
+                  autoComplete="off"
+                  value={apiKey}
+                  onChange={(event) => {
+                    setApiKey(event.target.value);
+                    setRemoveKey(false);
+                  }}
+                  className="pr-11 font-mono text-xs"
+                  placeholder="sk-..."
+                  aria-label="OpenAI API key"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey((shown) => !shown)}
+                  className="text-faint hover:text-ink absolute top-1/2 right-3 -translate-y-1/2 rounded p-1 transition-colors"
+                  aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                >
+                  {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               <Button
                 type="button"
-                variant="danger"
-                size="sm"
-                className="mt-4"
-                onClick={() => setRemoveKey(true)}
+                variant="secondary"
+                size="icon"
+                disabled={!apiKey}
+                onClick={copyApiKey}
+                title="Copy API key"
+                aria-label="Copy API key"
               >
-                <Trash2 size={14} />
-                Remove key
+                <Copy size={16} />
               </Button>
             </div>
-          ) : (
-            <div className="mt-5 space-y-3">
-              {removeKey ? (
-                <>
-                  <p className="text-dim text-xs leading-5">
-                    The key will be deleted when you save your profile.
-                  </p>
+            <p className="text-faint text-[11px] leading-5">
+              Edit this value, then click Save profile. Copy uses the current
+              value shown here.
+            </p>
+            {storedApiKey && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setApiKey("");
+                    setRemoveKey(true);
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Remove key
+                </Button>
+                {removeKey && (
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() => setRemoveKey(false)}
+                    onClick={() => {
+                      setApiKey(storedApiKey);
+                      setRemoveKey(false);
+                    }}
                   >
-                    Keep the key
+                    Undo remove
                   </Button>
-                </>
-              ) : (
-                <Field
-                  label="Add a key"
-                  htmlFor="openAiApiKey"
-                  hint="Saved with the profile form on the left."
-                >
-                  <Input
-                    id="openAiApiKey"
-                    name="openAiApiKey"
-                    form="profile-form"
-                    type="password"
-                    autoComplete="off"
-                    placeholder="sk-..."
-                  />
-                </Field>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </Card>
 
         <PasswordCard />
