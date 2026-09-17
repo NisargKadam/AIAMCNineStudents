@@ -5,6 +5,7 @@ import { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
 import { createStudentAction } from "@/features/admin/actions";
+import { requestPasswordResetAction } from "@/features/auth/actions";
 import SubmissionsPage from "@/app/(portal)/admin/submissions/page";
 import StudentRecordPage from "@/app/(portal)/admin/students/[id]/page";
 import AdminStudentsPage from "@/app/(portal)/admin/students/page";
@@ -117,6 +118,20 @@ describe("admin submission views", () => {
     expect(html).not.toContain(`${suite}-admin@example.test`);
   });
 
+  it("records a forgot-password request for the matching student", async () => {
+    const form = new FormData();
+    form.set("email", ` ${suite.toUpperCase()}@EXAMPLE.TEST `);
+    const result = await requestPasswordResetAction(null, form);
+    const request = await db.passwordResetRequest.findUnique({
+      where: { userId: studentId },
+    });
+
+    expect(result.success).toContain("Request received");
+    expect(request?.userId).toBe(studentId);
+    const roster = renderToStaticMarkup(await AdminStudentsPage());
+    expect(roster).toContain("resetRequestedAt");
+  });
+
   it("recovers an existing student login without losing submitted work", async () => {
     await db.user.update({
       where: { id: studentId },
@@ -138,7 +153,12 @@ describe("admin submission views", () => {
     });
     const recovered = await db.user.findUniqueOrThrow({
       where: { id: studentId },
-      include: { profile: true, submissions: true, sessions: true },
+      include: {
+        profile: true,
+        submissions: true,
+        sessions: true,
+        passwordResetRequest: true,
+      },
     });
 
     expect(result.success).toContain(
@@ -148,6 +168,7 @@ describe("admin submission views", () => {
     expect(recovered.profile?.fullName).toBe(`${suite} recovered`);
     expect(recovered.submissions).toHaveLength(2);
     expect(recovered.sessions).toHaveLength(0);
+    expect(recovered.passwordResetRequest).toBeNull();
     expect(
       await bcrypt.compare("RecoveredPass123", recovered.passwordHash),
     ).toBe(true);

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { loginAction } from "@/features/auth/actions";
@@ -43,6 +44,15 @@ export function LoginForm() {
           </button>
         </div>
       </Field>
+
+      <div className="-mt-2 flex justify-end">
+        <Link
+          href="/forgot-password"
+          className="text-ember text-xs font-semibold hover:underline"
+        >
+          Forgot password?
+        </Link>
+      </div>
 
       <label className="text-dim flex w-fit cursor-pointer items-center gap-2.5 text-xs">
         <input

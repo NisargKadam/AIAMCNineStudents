@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { loginSchema } from "@/lib/validation";
+import { loginSchema, passwordResetRequestSchema } from "@/lib/validation";
 import {
   createSession,
   destroySession,
@@ -43,6 +43,33 @@ export async function loginAction(_: unknown, formData: FormData) {
     return { error: "This account is inactive. Contact an administrator." };
   await createSession(user.id, parsed.data.remember);
   redirect("/dashboard");
+}
+
+export async function requestPasswordResetAction(
+  _: unknown,
+  formData: FormData,
+) {
+  const parsed = passwordResetRequestSchema.safeParse({
+    email: formData.get("email"),
+  });
+  if (!parsed.success) return { error: "Enter a valid email address." };
+
+  const user = await db.user.findUnique({
+    where: { email: parsed.data.email },
+    select: { id: true, role: true },
+  });
+  if (user?.role === "STUDENT") {
+    await db.passwordResetRequest.upsert({
+      where: { userId: user.id },
+      update: { requestedAt: new Date() },
+      create: { userId: user.id },
+    });
+  }
+
+  return {
+    success:
+      "Request received. Your administrator can now set a new password without affecting your work.",
+  };
 }
 
 export async function logoutAction() {

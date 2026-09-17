@@ -44,6 +44,7 @@ export type ManagedStudent = {
   currentRole: string | null;
   country: string | null;
   joinedAt: string;
+  resetRequestedAt: string | null;
   prereqDone: number;
   prereqTotal: number;
   approvedCount: number;
@@ -66,6 +67,9 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
   const [deleting, setDeleting] = useState<ManagedStudent | null>(null);
   const [bulkDelete, setBulkDelete] = useState(false);
   const [pending, start] = useTransition();
+  const resetRequestCount = students.filter(
+    (student) => student.resetRequestedAt,
+  ).length;
 
   function run(action: () => Promise<Result>, fallback = "Done.") {
     start(async () => {
@@ -102,6 +106,8 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
     return [...list].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name);
       if (sort === "progress") return progress(b) - progress(a);
+      if (Boolean(a.resetRequestedAt) !== Boolean(b.resetRequestedAt))
+        return a.resetRequestedAt ? -1 : 1;
       return b.joinedAt.localeCompare(a.joinedAt);
     });
   }, [students, query, status, sort]);
@@ -132,6 +138,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
       "assignments_submitted",
       "assignments_approved",
       "assignments_total",
+      "password_reset_requested_at",
       "joined_at",
     ];
     const rows = filtered.map((s) =>
@@ -147,6 +154,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
         s.submittedCount,
         s.approvedCount,
         s.assignmentTotal,
+        s.resetRequestedAt ?? "",
         s.joinedAt,
       ]
         .map((value) => `"${String(value).replaceAll('"', '""')}"`)
@@ -168,6 +176,22 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
 
   return (
     <>
+      {resetRequestCount > 0 && (
+        <Card
+          tone="raised"
+          className="mb-4 flex flex-wrap items-center gap-3 border-[color-mix(in_oklab,var(--caution)_35%,var(--line))] p-4"
+        >
+          <KeyRound size={17} className="text-[var(--caution)]" />
+          <p className="text-ink text-sm font-semibold">
+            {resetRequestCount} {pluralize(resetRequestCount, "student")}{" "}
+            requested a password reset
+          </p>
+          <p className="text-dim text-xs">
+            Requested students appear first. Use the key button to set a new
+            password.
+          </p>
+        </Card>
+      )}
       <div className="mb-4 grid gap-2 lg:grid-cols-[1fr_auto_auto_auto]">
         <div className="relative">
           <Search
@@ -327,6 +351,9 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                         {student.email}
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {student.resetRequestedAt && (
+                          <Badge tone="caution">Password reset requested</Badge>
+                        )}
                         {!student.isActive && (
                           <Badge tone="alert">Inactive</Badge>
                         )}
@@ -385,9 +412,13 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                       <Pencil size={14} />
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant={student.resetRequestedAt ? "secondary" : "ghost"}
                       size="icon-sm"
-                      title="Set password"
+                      title={
+                        student.resetRequestedAt
+                          ? "Respond to password reset request"
+                          : "Set password"
+                      }
                       aria-label={`Set password for ${student.name}`}
                       onClick={() => setPasswordFor(student)}
                     >

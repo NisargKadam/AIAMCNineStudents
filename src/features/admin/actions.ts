@@ -75,6 +75,7 @@ export async function createStudentAction(input: unknown) {
         },
       }),
       db.session.deleteMany({ where: { userId: existing.id } }),
+      db.passwordResetRequest.deleteMany({ where: { userId: existing.id } }),
     ]);
     await audit(admin.id, "student_access_recovered", "User", existing.id, {
       email: existing.email,
@@ -180,11 +181,14 @@ export async function resetStudentPasswordAction(userId: string) {
   if (!password)
     return { error: "DEFAULT_STUDENT_PASSWORD is not configured." };
 
-  await db.user.update({
-    where: { id: userId },
-    data: { passwordHash: await bcrypt.hash(password, 12) },
-  });
-  await db.session.deleteMany({ where: { userId } });
+  await db.$transaction([
+    db.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(password, 12) },
+    }),
+    db.session.deleteMany({ where: { userId } }),
+    db.passwordResetRequest.deleteMany({ where: { userId } }),
+  ]);
   await audit(admin.id, "password_reset", "User", userId);
   refreshStudentViews(userId);
   return {
@@ -197,11 +201,16 @@ export async function setStudentPasswordAction(input: unknown) {
   const parsed = adminPasswordSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
-  await db.user.update({
-    where: { id: parsed.data.userId },
-    data: { passwordHash: await bcrypt.hash(parsed.data.password, 12) },
-  });
-  await db.session.deleteMany({ where: { userId: parsed.data.userId } });
+  await db.$transaction([
+    db.user.update({
+      where: { id: parsed.data.userId },
+      data: { passwordHash: await bcrypt.hash(parsed.data.password, 12) },
+    }),
+    db.session.deleteMany({ where: { userId: parsed.data.userId } }),
+    db.passwordResetRequest.deleteMany({
+      where: { userId: parsed.data.userId },
+    }),
+  ]);
   await audit(admin.id, "password_set_by_admin", "User", parsed.data.userId);
   refreshStudentViews(parsed.data.userId);
   return { success: "Password set. Existing sessions were ended." };

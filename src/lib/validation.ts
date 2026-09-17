@@ -12,6 +12,9 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(200),
   remember: z.boolean().optional(),
 });
+export const passwordResetRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
+});
 export const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
   githubUsername: z

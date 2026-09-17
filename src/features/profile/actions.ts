@@ -86,10 +86,13 @@ export async function changeOwnPasswordAction(_: unknown, formData: FormData) {
     user.passwordHash,
   );
   if (!valid) return { error: "That is not your current password." };
-  await db.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
-  });
+  await db.$transaction([
+    db.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 12) },
+    }),
+    db.passwordResetRequest.deleteMany({ where: { userId: user.id } }),
+  ]);
   await revokeOtherSessions(user.id);
   await audit(user.id, "password_changed", "User", user.id);
   revalidatePath("/profile");

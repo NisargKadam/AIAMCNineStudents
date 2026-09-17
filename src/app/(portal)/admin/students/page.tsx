@@ -13,6 +13,7 @@ export default async function AdminStudentsPage() {
       orderBy: { createdAt: "desc" },
       include: {
         profile: true,
+        passwordResetRequest: true,
         prerequisites: {
           where: {
             completed: true,
@@ -48,6 +49,8 @@ export default async function AdminStudentsPage() {
           currentRole: user.profile?.currentRole ?? null,
           country: user.profile?.country ?? null,
           joinedAt: user.createdAt.toISOString(),
+          resetRequestedAt:
+            user.passwordResetRequest?.requestedAt.toISOString() ?? null,
           prereqDone: user.prerequisites.length,
           prereqTotal,
           approvedCount: user.submissions.filter(

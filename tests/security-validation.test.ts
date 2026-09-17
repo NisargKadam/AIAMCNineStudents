@@ -12,6 +12,7 @@ import {
   githubUrlSchema,
   loginSchema,
   passwordChangeSchema,
+  passwordResetRequestSchema,
   postSchema,
   profileSchema,
   submissionSchema,
@@ -62,6 +63,12 @@ describe("authentication and authorization", () => {
         confirmPassword: "NewPassword123",
       }).success,
     ).toBe(true);
+  });
+  it("normalizes password reset request emails", () => {
+    expect(
+      passwordResetRequestSchema.parse({ email: " STUDENT@Example.COM " })
+        .email,
+    ).toBe("student@example.com");
   });
   it("blocks students and allows admins in the policy used by the admin guard", () => {
     expect(canAccessAdmin(Role.STUDENT)).toBe(false);
