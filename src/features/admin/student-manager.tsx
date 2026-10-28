@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import {
+  ArrowRightLeft,
   ArrowUpRight,
   Download,
   KeyRound,
@@ -19,6 +20,7 @@ import {
   bulkStudentAction,
   createStudentAction,
   deleteStudentAction,
+  moveStudentsToBatchAction,
   resetStudentPasswordAction,
   setStudentActiveAction,
   setStudentPasswordAction,
@@ -32,7 +34,7 @@ import { Progress } from "@/components/ui/progress";
 import { Confirm, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/avatar";
-import { pluralize } from "@/lib/utils";
+import { batchLabel, pluralize } from "@/lib/utils";
 
 export type ManagedStudent = {
   id: string;
@@ -43,6 +45,8 @@ export type ManagedStudent = {
   githubUsername: string | null;
   currentRole: string | null;
   country: string | null;
+  batchId: string | null;
+  batchNumber: number | null;
   joinedAt: string;
   resetRequestedAt: string | null;
   prereqDone: number;
@@ -53,10 +57,24 @@ export type ManagedStudent = {
   assignmentTotal: number;
 };
 
+export type BatchOption = { id: string; number: number; isEnrolling: boolean };
+
 type Result = { error?: string; success?: unknown };
 type Sort = "recent" | "name" | "progress";
 
-export function StudentManager({ students }: { students: ManagedStudent[] }) {
+export function StudentManager({
+  students,
+  batches,
+  viewingBatch,
+}: {
+  students: ManagedStudent[];
+  batches: BatchOption[];
+  /** The batch tab being shown, or null for every batch. */
+  viewingBatch: number | null;
+}) {
+  const enrolling =
+    batches.find((batch) => batch.isEnrolling) ?? batches[0] ?? null;
+  const [moveTo, setMoveTo] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [sort, setSort] = useState<Sort>("recent");
@@ -129,6 +147,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
     const header = [
       "name",
       "email",
+      "batch",
       "active",
       "github",
       "current_role",
@@ -145,6 +164,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
       [
         s.name,
         s.email,
+        s.batchNumber ?? "",
         s.isActive ? "yes" : "no",
         s.githubUsername ?? "",
         s.currentRole ?? "",
@@ -166,7 +186,9 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `ai-amc-students-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `ai-amc-students-${
+      viewingBatch === null ? "" : `batch-${viewingBatch}-`
+    }${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
     toast.success(
@@ -248,6 +270,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
         </label>
         <span className="text-faint num text-xs">
           {filtered.length} of {students.length} students
+          {viewingBatch !== null && ` in ${batchLabel(viewingBatch)}`}
         </span>
         <Button
           variant="ghost"
@@ -269,6 +292,45 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
             {selectedList.length} selected
           </p>
           <div className="ml-auto flex flex-wrap gap-2">
+            <div className="flex gap-1.5">
+              <Select
+                aria-label="Batch to move the selected students to"
+                className="h-8 w-auto py-0 pr-8 text-xs"
+                value={moveTo}
+                onChange={(event) => setMoveTo(event.target.value)}
+              >
+                <option value="">Move to batch…</option>
+                {batches.map((batch) => (
+                  <option key={batch.id} value={batch.id}>
+                    {batchLabel(batch.number)}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pending || !moveTo}
+                onClick={() =>
+                  run(
+                    () =>
+                      moveStudentsToBatchAction(
+                        selectedList.map((s) => s.id),
+                        moveTo,
+                      ).then((result) => {
+                        if (!result.error) {
+                          setSelected(new Set());
+                          setMoveTo("");
+                        }
+                        return result;
+                      }),
+                    "Students moved.",
+                  )
+                }
+              >
+                <ArrowRightLeft size={14} />
+                Move
+              </Button>
+            </div>
             <Button
               variant="secondary"
               size="sm"
@@ -351,6 +413,20 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                         {student.email}
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {viewingBatch === null &&
+                          (student.batchNumber !== null ? (
+                            <Badge
+                              tone={
+                                student.batchId === enrolling?.id
+                                  ? "ember"
+                                  : "neutral"
+                              }
+                            >
+                              {batchLabel(student.batchNumber)}
+                            </Badge>
+                          ) : (
+                            <Badge tone="caution">No batch</Badge>
+                          ))}
                         {student.resetRequestedAt && (
                           <Badge tone="caution">Password reset requested</Badge>
                         )}
@@ -462,8 +538,16 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
       ) : (
         <EmptyState
           icon={UserPlus}
-          title="No accounts match these filters"
-          description="Clear the search or filters, or add the first student to this cohort."
+          title={
+            students.length === 0 && viewingBatch !== null
+              ? `No students in ${batchLabel(viewingBatch)} yet`
+              : "No accounts match these filters"
+          }
+          description={
+            students.length === 0 && viewingBatch !== null
+              ? "Students you add join the enrolling batch. Move existing students here from the All batches tab."
+              : "Clear the search or filters, or add the first student to this cohort."
+          }
           action={
             <Button onClick={() => setAdding(true)}>
               <Plus size={16} />
@@ -492,6 +576,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                   email: form.get("email"),
                   githubUsername: form.get("githubUsername"),
                   password: form.get("password"),
+                  batchId: form.get("batchId"),
                 }).then((result) => {
                   if (!result.error) setAdding(false);
                   return result;
@@ -526,6 +611,25 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                 minLength={12}
                 autoComplete="new-password"
               />
+            </Field>
+            <Field
+              label="Batch"
+              htmlFor="new-batch"
+              hint="New students join the enrolling batch unless you pick another. A returning student keeps their batch."
+              className="sm:col-span-2"
+            >
+              <Select
+                id="new-batch"
+                name="batchId"
+                defaultValue={enrolling?.id ?? ""}
+              >
+                {batches.map((batch) => (
+                  <option key={batch.id} value={batch.id}>
+                    {batchLabel(batch.number)}
+                    {batch.isEnrolling ? " (enrolling)" : ""}
+                  </option>
+                ))}
+              </Select>
             </Field>
           </div>
           <div className="flex justify-end gap-2 pt-1">
@@ -566,6 +670,7 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                     githubUsername: form.get("githubUsername"),
                     currentRole: form.get("currentRole"),
                     country: form.get("country"),
+                    batchId: form.get("batchId") || undefined,
                   }).then((result) => {
                     if (!result.error) setEditing(null);
                     return result;
@@ -612,6 +717,27 @@ export function StudentManager({ students }: { students: ManagedStudent[] }) {
                   name="country"
                   defaultValue={editing.country ?? ""}
                 />
+              </Field>
+              <Field
+                label="Batch"
+                htmlFor="edit-batch"
+                hint="Moving a student changes which sessions and materials they see. Their work is kept."
+                className="sm:col-span-2"
+              >
+                <Select
+                  id="edit-batch"
+                  name="batchId"
+                  defaultValue={editing.batchId ?? ""}
+                >
+                  {editing.batchId === null && (
+                    <option value="">No batch</option>
+                  )}
+                  {batches.map((batch) => (
+                    <option key={batch.id} value={batch.id}>
+                      {batchLabel(batch.number)}
+                    </option>
+                  ))}
+                </Select>
               </Field>
             </div>
             <div className="flex flex-wrap justify-between gap-2 pt-1">

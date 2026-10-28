@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth/session";
 import { loadSignals } from "@/lib/signals";
 import { AppShell } from "@/components/app-shell";
+import { batchLabel } from "@/lib/utils";
 
 export default async function PortalLayout({
   children,
@@ -16,6 +17,7 @@ export default async function PortalLayout({
         email: user.email,
         role: user.role,
         avatarUrl: user.profile?.avatarUrl,
+        batch: user.batch ? batchLabel(user.batch.number) : null,
       }}
       signals={signals}
     >

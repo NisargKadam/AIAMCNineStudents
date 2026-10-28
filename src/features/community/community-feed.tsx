@@ -35,7 +35,7 @@ import { Confirm } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
-import { cn } from "@/lib/utils";
+import { batchLabel, cn } from "@/lib/utils";
 
 export type FeedPost = {
   id: string;
@@ -49,6 +49,8 @@ export type FeedPost = {
     role: "ADMIN" | "STUDENT";
     avatarUrl: string | null;
     githubUsername: string | null;
+    /** The author's batch number; null for instructors. */
+    batch: number | null;
   };
   owned: boolean;
   authored: boolean;
@@ -60,11 +62,11 @@ export type FeedPost = {
     content: string;
     createdAt: string;
     owned: boolean;
-    author: { name: string; avatarUrl: string | null };
+    author: { name: string; avatarUrl: string | null; batch: number | null };
   }>;
 };
 
-export type FeedView = "all" | "mine" | "saved";
+export type FeedView = "all" | "batch" | "mine" | "saved";
 
 function Composer({ authorName }: { authorName: string }) {
   const [pending, start] = useTransition();
@@ -280,8 +282,12 @@ function PostCard({ post }: { post: FeedPost }) {
               <h2 className="text-ink truncate text-sm font-semibold">
                 {post.author.name}
               </h2>
-              {post.author.role === "ADMIN" && (
+              {post.author.role === "ADMIN" ? (
                 <Badge tone="ember">Instructor</Badge>
+              ) : (
+                post.author.batch !== null && (
+                  <Badge tone="halo">{batchLabel(post.author.batch)}</Badge>
+                )
               )}
             </div>
             <p className="text-faint mt-0.5 text-[11px]">
@@ -460,6 +466,11 @@ function PostCard({ post }: { post: FeedPost }) {
                     <div className="min-w-0 flex-1">
                       <p className="text-ink text-[11px] font-semibold">
                         {comment.author.name}
+                        {comment.author.batch !== null && (
+                          <span className="ml-2 font-normal text-[var(--halo)]">
+                            {batchLabel(comment.author.batch)}
+                          </span>
+                        )}
                         <span className="text-faint ml-2 font-normal">
                           {formatDistanceToNow(new Date(comment.createdAt), {
                             addSuffix: true,
@@ -520,14 +531,20 @@ export function CommunityFeed({
   nextPage,
   view,
   authorName,
+  batch,
 }: {
   posts: FeedPost[];
   nextPage: number | null;
   view: FeedView;
   authorName: string;
+  /** The viewer's batch number, which adds a feed of just that batch. */
+  batch: number | null;
 }) {
   const views: Array<{ key: FeedView; label: string }> = [
     { key: "all", label: "Everything" },
+    ...(batch !== null
+      ? [{ key: "batch" as const, label: batchLabel(batch) }]
+      : []),
     { key: "mine", label: "My posts" },
     { key: "saved", label: "Saved" },
   ];
@@ -563,14 +580,18 @@ export function CommunityFeed({
               ? "Nothing saved yet"
               : view === "mine"
                 ? "You have not posted yet"
-                : "The feed is empty"
+                : view === "batch" && batch !== null
+                  ? `Nobody in ${batchLabel(batch)} has posted yet`
+                  : "The feed is empty"
           }
           description={
             view === "saved"
               ? "Bookmark a post and it will wait for you here."
               : view === "mine"
                 ? "Share a build note, a blocker, or something you learned this week."
-                : "Be the first to share what you are building."
+                : view === "batch"
+                  ? "Posts from your batchmates collect here. Share yours from Everything."
+                  : "Be the first to share what you are building."
           }
           action={
             view !== "all" ? (

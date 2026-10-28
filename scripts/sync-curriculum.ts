@@ -15,6 +15,23 @@
 import { PrismaClient } from "@prisma/client";
 import { assignments, categories, sessionCount } from "../prisma/curriculum";
 
+/**
+ * Adds any of the curriculum's numbered session slots a batch is missing.
+ * Existing sessions keep their titles, dates, and links.
+ */
+export async function ensureSessionSlots(
+  prisma: PrismaClient,
+  batchId: string,
+) {
+  for (let sortOrder = 1; sortOrder <= sessionCount; sortOrder += 1) {
+    await prisma.cohortSession.upsert({
+      where: { batchId_sortOrder: { batchId, sortOrder } },
+      update: {},
+      create: { batchId, sortOrder, title: `Session ${sortOrder}` },
+    });
+  }
+}
+
 export async function syncCurriculum(prisma: PrismaClient) {
   const removed = { categories: 0, prerequisites: 0 };
   const kept: string[] = [];
@@ -88,14 +105,10 @@ export async function syncCurriculum(prisma: PrismaClient) {
     data: { isActive: false },
   });
 
-  // Sessions carry administrator-owned links, so only missing rows are added.
-  for (let sortOrder = 1; sortOrder <= sessionCount; sortOrder += 1) {
-    await prisma.cohortSession.upsert({
-      where: { sortOrder },
-      update: {},
-      create: { sortOrder, title: `Session ${sortOrder}` },
-    });
-  }
+  // Sessions carry administrator-owned links, so only missing rows are added,
+  // in every batch.
+  const batches = await prisma.batch.findMany({ select: { id: true } });
+  for (const batch of batches) await ensureSessionSlots(prisma, batch.id);
 
   const config = await prisma.prerequisiteConfig.findUnique({
     where: { id: 1 },
@@ -106,7 +119,7 @@ export async function syncCurriculum(prisma: PrismaClient) {
     [
       `Curriculum synced.`,
       `  ${categories.length} categories, ${totalChecks} readiness checks`,
-      `  ${assignments.length} projects, ${sessionCount} session slots`,
+      `  ${assignments.length} projects, ${sessionCount} session slots in each of ${batches.length} batches`,
       `  removed ${removed.categories} stale categories and ${removed.prerequisites} stale checks`,
       `  hid ${hidden.count} extra projects`,
       `  checklist version is now ${config?.version ?? 1}`,

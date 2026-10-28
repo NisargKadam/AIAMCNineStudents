@@ -25,8 +25,11 @@ model User {
   passwordHash             String
   role                     Role                      @default(STUDENT)
   isActive                 Boolean                   @default(true)
+  /// Students always belong to a batch; administrators sit outside all batches.
+  batchId                  String?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
+  batch                    Batch?                    @relation(fields: [batchId], references: [id], onDelete: Restrict)
   profile                  StudentProfile?
   sessions                 Session[]
   prerequisites            StudentPrerequisite[]
@@ -40,6 +43,21 @@ model User {
   auditLogs                AuditLog[]                @relation("AuditActor")
 
   @@index([role, isActive])
+  @@index([batchId, role])
+}
+
+/// One intake of the masterclass ("Batch 9", "Batch 11"). Each batch has its
+/// own students and its own live-session schedule; the curriculum, readiness
+/// checklist, and community are shared. Exactly one batch is enrolling at a
+/// time, and that is where newly added students go.
+model Batch {
+  id          String          @id @default(cuid())
+  number      Int             @unique
+  isEnrolling Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  students    User[]
+  sessions    CohortSession[]
 }
 
 model PasswordResetRequest {
@@ -245,11 +263,12 @@ model AuditLog {
   @@index([entityType, entityId])
 }
 
-/// A live class in the cohort. `Session` is taken by authentication, so the
+/// A live class for one batch. `Session` is taken by authentication, so the
 /// teaching sessions live under their own name.
 model CohortSession {
   id           String       @id @default(cuid())
-  sortOrder    Int          @unique
+  batchId      String
+  sortOrder    Int
   title        String
   description  String?      @db.VarChar(1000)
   scheduledAt  DateTime?
@@ -258,9 +277,11 @@ model CohortSession {
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  batch        Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
   materials    StoredFile[]
 
-  @@index([isActive, sortOrder])
+  @@unique([batchId, sortOrder])
+  @@index([batchId, isActive, sortOrder])
 }
 
 enum StoredFileKind {

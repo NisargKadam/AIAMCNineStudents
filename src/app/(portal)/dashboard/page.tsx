@@ -3,7 +3,12 @@ import { formatDistanceToNow } from "date-fns";
 import { ArrowUpRight, Check, Heart, MessageSquare } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
-import { firstName, percentage, submissionStatus } from "@/lib/utils";
+import {
+  batchLabel,
+  firstName,
+  percentage,
+  submissionStatus,
+} from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/avatar";
@@ -108,7 +113,11 @@ export default async function DashboardPage() {
         <p className="text-dim flex items-center gap-2.5 text-xs">
           <span className="live-dot size-1.5 rounded-full bg-[var(--verified)]" />
           Signed in as{" "}
-          {user.role === "ADMIN" ? "an administrator" : "a student"}
+          {user.role === "ADMIN"
+            ? "an administrator"
+            : user.batch
+              ? `a student in ${batchLabel(user.batch.number)}`
+              : "a student"}
         </p>
         <h1 className="font-display text-ink mt-3 text-[30px] leading-tight font-semibold sm:text-[34px]">
           Welcome back, {firstName(user.profile?.fullName ?? user.email)}

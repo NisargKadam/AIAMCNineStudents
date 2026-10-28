@@ -1,8 +1,10 @@
 "use client";
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   CalendarDays,
   ExternalLink,
+  Layers,
   LoaderCircle,
   Pencil,
   Play,
@@ -53,10 +55,15 @@ const blank = (sortOrder: number): Draft => ({
 export function SessionBoard({
   sessions,
   canEdit,
+  batchId,
+  batchName,
   nextSessionId,
 }: {
   sessions: CohortSession[];
   canEdit: boolean;
+  /** The batch whose schedule this is; new sessions are added to it. */
+  batchId: string | null;
+  batchName: string | null;
   /** Decided on the server so the clock is read once per request. */
   nextSessionId: string | null;
 }) {
@@ -80,6 +87,7 @@ export function SessionBoard({
     start(async () => {
       const result = await upsertSessionAction({
         id: draft.id || undefined,
+        batchId: draft.id ? undefined : (batchId ?? undefined),
         sortOrder: draft.sortOrder,
         title: draft.title,
         description: draft.description ?? "",
@@ -95,6 +103,20 @@ export function SessionBoard({
       }
     });
   }
+
+  if (canEdit && !batchId)
+    return (
+      <EmptyState
+        icon={Layers}
+        title="Create a batch first"
+        description="Every session belongs to a batch. Create one, then add its schedule here."
+        action={
+          <Button asChild>
+            <Link href="/admin/batches">Open batches</Link>
+          </Button>
+        }
+      />
+    );
 
   return (
     <>
@@ -155,8 +177,9 @@ export function SessionBoard({
       {canEdit && (
         <div className="mb-4 flex items-center justify-between">
           <p className="text-dim text-xs">
-            {sessions.length} {pluralize(sessions.length, "session")}. Students
-            see the links but cannot change them.
+            {sessions.length} {pluralize(sessions.length, "session")} for{" "}
+            {batchName}. Students in this batch see the links but cannot change
+            them.
           </p>
           <Button onClick={() => setEditing(blank(nextOrder))}>
             <Plus size={16} />
@@ -295,7 +318,7 @@ export function SessionBoard({
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}
         title={editing?.id ? "Edit session" : "Add session"}
-        description="Students see everything here as soon as you save it."
+        description={`Students in ${batchName ?? "this batch"} see everything here as soon as you save it.`}
       >
         {editing && (
           <form
@@ -431,7 +454,7 @@ export function SessionBoard({
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete ${deleting?.title ?? "this session"}?`}
-        description="The session and its links are removed for everyone. This cannot be undone."
+        description={`The session, its links, and its materials are removed for everyone in ${batchName ?? "this batch"}. This cannot be undone.`}
         confirmLabel="Delete session"
         pending={pending}
         onConfirm={() => {

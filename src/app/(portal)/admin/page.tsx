@@ -2,16 +2,41 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowUpRight, CircleAlert } from "lucide-react";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
+import { resolveBatchFilter } from "@/lib/batches";
 import { PageHeader } from "@/components/page-header";
+import { LinkTabs } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar } from "@/components/avatar";
-import { percentage, pluralize, submissionStatus } from "@/lib/utils";
+import {
+  batchLabel,
+  percentage,
+  pluralize,
+  submissionStatus,
+} from "@/lib/utils";
 
 export const metadata = { title: "Admin overview" };
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ batch?: string }>;
+}) {
+  await requireAdmin();
+  const batches = await db.batch.findMany({
+    orderBy: { number: "desc" },
+    include: {
+      _count: { select: { students: { where: { role: "STUDENT" } } } },
+    },
+  });
+  const filter = resolveBatchFilter((await searchParams).batch, batches);
+  const viewing = batches.find((batch) => batch.id === filter.batchId);
+  // Every figure below follows the selected batch; "all" leaves it unfiltered.
+  const inBatch =
+    filter.batchId === undefined ? {} : { batchId: filter.batchId };
+
   const [
     students,
     activeStudents,
@@ -22,27 +47,40 @@ export default async function AdminPage() {
     recent,
     confirmations,
   ] = await Promise.all([
-    db.user.count({ where: { role: "STUDENT" } }),
-    db.user.count({ where: { role: "STUDENT", isActive: true } }),
+    db.user.count({ where: { role: "STUDENT", ...inBatch } }),
+    db.user.count({ where: { role: "STUDENT", isActive: true, ...inBatch } }),
     db.prerequisite.count({
       where: { isActive: true, category: { isActive: true } },
     }),
     db.assignment.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
-      include: { _count: { select: { submissions: true } } },
+      include: {
+        _count: {
+          select: { submissions: { where: { user: inBatch } } },
+        },
+      },
     }),
-    db.assignmentSubmission.groupBy({ by: ["status"], _count: true }),
-    db.post.count(),
+    db.assignmentSubmission.groupBy({
+      by: ["status"],
+      where: { user: inBatch },
+      _count: true,
+    }),
+    db.post.count({ where: { user: inBatch } }),
     db.assignmentSubmission.findMany({
+      where: { user: inBatch },
       take: 6,
       orderBy: { updatedAt: "desc" },
       include: {
         assignment: { select: { title: true } },
-        user: { include: { profile: true } },
+        user: {
+          include: { profile: true, batch: { select: { number: true } } },
+        },
       },
     }),
-    db.prerequisiteConfirmation.count({ where: { invalidatedAt: null } }),
+    db.prerequisiteConfirmation.count({
+      where: { invalidatedAt: null, user: { role: "STUDENT", ...inBatch } },
+    }),
   ]);
 
   const countFor = (status: string) =>
@@ -77,7 +115,9 @@ export default async function AdminPage() {
     {
       label: "Community posts",
       value: posts,
-      caption: "across the cohort",
+      caption: viewing
+        ? `by ${batchLabel(viewing.number)} members`
+        : "across every batch",
     },
   ];
 
@@ -85,8 +125,16 @@ export default async function AdminPage() {
     <>
       <PageHeader
         eyebrow="Admin console"
-        title="Cohort operations"
-        description="Where the cohort stands on readiness, delivery, and participation."
+        title={
+          viewing
+            ? `${batchLabel(viewing.number)} operations`
+            : "Cohort operations"
+        }
+        description={
+          viewing
+            ? `Where ${batchLabel(viewing.number)} stands on readiness, delivery, and participation.`
+            : "Where every batch stands on readiness, delivery, and participation."
+        }
         action={
           awaitingReview > 0 ? (
             <Badge tone="caution">
@@ -99,6 +147,32 @@ export default async function AdminPage() {
           )
         }
       />
+
+      {batches.length > 0 && (
+        <LinkTabs
+          className="mb-5"
+          active={filter.key}
+          tabs={[
+            {
+              key: "all",
+              label: "All batches",
+              href: "/admin",
+              count: batches.reduce(
+                (sum, batch) => sum + batch._count.students,
+                0,
+              ),
+            },
+            ...batches.map((batch) => ({
+              key: String(batch.number),
+              label: batch.isEnrolling
+                ? `${batchLabel(batch.number)} · enrolling`
+                : batchLabel(batch.number),
+              href: `/admin?batch=${batch.number}`,
+              count: batch._count.students,
+            })),
+          ]}
+        />
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
@@ -180,7 +254,11 @@ export default async function AdminPage() {
               Latest submissions
             </h2>
             <Link
-              href="/admin/submissions"
+              href={
+                viewing
+                  ? `/admin/submissions?batch=${viewing.number}`
+                  : "/admin/submissions"
+              }
               className="text-dim hover:text-ink flex items-center gap-1 text-xs transition-colors"
             >
               View all submissions
@@ -210,6 +288,9 @@ export default async function AdminPage() {
                         </p>
                         <p className="text-faint truncate text-[11px]">
                           {submission.assignment.title}
+                          {!viewing &&
+                            submission.user.batch &&
+                            ` · ${batchLabel(submission.user.batch.number)}`}
                         </p>
                       </div>
                       <span className="text-faint text-[11px]">

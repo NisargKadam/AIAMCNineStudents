@@ -111,7 +111,9 @@ describe("admin submission views", () => {
   });
 
   it("reports submitted, approved, and awaiting-review counts in the roster", async () => {
-    const html = renderToStaticMarkup(await AdminStudentsPage());
+    const html = renderToStaticMarkup(
+      await AdminStudentsPage({ searchParams: Promise.resolve({}) }),
+    );
     expect(html).toContain(
       "&quot;approvedCount&quot;:0,&quot;submittedCount&quot;:1,&quot;awaitingReviewCount&quot;:1",
     );
@@ -128,7 +130,9 @@ describe("admin submission views", () => {
 
     expect(result.success).toContain("Request received");
     expect(request?.userId).toBe(studentId);
-    const roster = renderToStaticMarkup(await AdminStudentsPage());
+    const roster = renderToStaticMarkup(
+      await AdminStudentsPage({ searchParams: Promise.resolve({}) }),
+    );
     expect(roster).toContain("resetRequestedAt");
   });
 

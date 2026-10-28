@@ -19,7 +19,12 @@ import { Dial, Progress } from "@/components/ui/progress";
 import { LinkTabs } from "@/components/ui/tabs";
 import { Avatar } from "@/components/avatar";
 import { ReviewSubmission } from "@/features/admin/review-submission";
-import { percentage, pluralize, submissionStatus } from "@/lib/utils";
+import {
+  batchLabel,
+  percentage,
+  pluralize,
+  submissionStatus,
+} from "@/lib/utils";
 
 const TABS = [
   "overview",
@@ -49,6 +54,7 @@ export default async function StudentRecordPage({
       where: { id, role: "STUDENT" },
       include: {
         profile: true,
+        batch: { select: { number: true } },
         prerequisiteConfirmation: true,
         prerequisites: {
           where: { completed: true },
@@ -196,6 +202,13 @@ export default async function StudentRecordPage({
             <Badge tone={user.role === "ADMIN" ? "ember" : "neutral"}>
               {user.role === "ADMIN" ? "Administrator" : "Student"}
             </Badge>
+            {user.batch ? (
+              <Link href={`/admin/students?batch=${user.batch.number}`}>
+                <Badge tone="halo">{batchLabel(user.batch.number)}</Badge>
+              </Link>
+            ) : (
+              <Badge tone="caution">No batch</Badge>
+            )}
             {awaitingReview > 0 && (
               <Badge tone="caution">{awaitingReview} awaiting review</Badge>
             )}

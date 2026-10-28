@@ -11,6 +11,8 @@ import {
   studentUpdateSchema,
 } from "@/lib/validation";
 import { audit } from "@/lib/audit";
+import { findEnrollingBatch } from "@/lib/batches";
+import { batchLabel, pluralize } from "@/lib/utils";
 
 /** The final active administrator must never be removed, demoted, or disabled. */
 async function isLastActiveAdmin(userId: string) {
@@ -27,9 +29,24 @@ async function isLastActiveAdmin(userId: string) {
 
 function refreshStudentViews(userId?: string) {
   revalidatePath("/admin/students");
+  revalidatePath("/admin/batches");
   revalidatePath("/admin");
   revalidatePath("/students");
   if (userId) revalidatePath(`/admin/students/${userId}`);
+}
+
+/** The batch an admin picked, or the enrolling batch when they left it blank. */
+async function batchFor(batchId: string | undefined) {
+  if (batchId) {
+    const batch = await db.batch.findUnique({ where: { id: batchId } });
+    return batch ?? { error: "That batch no longer exists. Pick another." };
+  }
+  const batch = await findEnrollingBatch(db);
+  return (
+    batch ?? {
+      error: "Create a batch first in Admin console → Batches.",
+    }
+  );
 }
 
 export async function createStudentAction(input: unknown) {
@@ -44,8 +61,12 @@ export async function createStudentAction(input: unknown) {
         "No password was given and DEFAULT_STUDENT_PASSWORD is not configured.",
     };
 
+  const batch = await batchFor(parsed.data.batchId);
+  if ("error" in batch) return { error: batch.error };
+
   const existing = await db.user.findUnique({
     where: { email: parsed.data.email },
+    include: { batch: true },
   });
   if (existing) {
     if (existing.role === Role.ADMIN)
@@ -54,12 +75,15 @@ export async function createStudentAction(input: unknown) {
           "That email belongs to an administrator. Update it from My Profile.",
       };
 
+    // A returning student keeps the batch they studied with.
+    const keptBatch = existing.batch ?? batch;
     await db.$transaction([
       db.user.update({
         where: { id: existing.id },
         data: {
           passwordHash: await bcrypt.hash(password, 12),
           isActive: true,
+          batchId: keptBatch.id,
           profile: {
             upsert: {
               create: {
@@ -80,10 +104,11 @@ export async function createStudentAction(input: unknown) {
     await audit(admin.id, "student_access_recovered", "User", existing.id, {
       email: existing.email,
       customPassword: Boolean(parsed.data.password),
+      batch: keptBatch.number,
     });
     refreshStudentViews(existing.id);
     return {
-      success: `${parsed.data.fullName}'s access was updated. Their existing submissions and progress were kept.`,
+      success: `${parsed.data.fullName}'s access was updated. They stay in ${batchLabel(keptBatch.number)}, and their existing submissions and progress were kept.`,
     };
   }
 
@@ -91,6 +116,7 @@ export async function createStudentAction(input: unknown) {
     data: {
       email: parsed.data.email,
       passwordHash: await bcrypt.hash(password, 12),
+      batchId: batch.id,
       profile: {
         create: {
           fullName: parsed.data.fullName,
@@ -102,12 +128,13 @@ export async function createStudentAction(input: unknown) {
   await audit(admin.id, "student_created", "User", user.id, {
     email: user.email,
     customPassword: Boolean(parsed.data.password),
+    batch: batch.number,
   });
   refreshStudentViews();
   return {
     success: parsed.data.password
-      ? `${parsed.data.fullName} can sign in with the password you set.`
-      : `${parsed.data.fullName} can sign in with the cohort default password.`,
+      ? `${parsed.data.fullName} joined ${batchLabel(batch.number)} and can sign in with the password you set.`
+      : `${parsed.data.fullName} joined ${batchLabel(batch.number)} and can sign in with the cohort default password.`,
   };
 }
 
@@ -116,9 +143,19 @@ export async function updateStudentAction(input: unknown) {
   const parsed = studentUpdateSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
 
-  const { userId, email, fullName, githubUsername, currentRole, country } =
-    parsed.data;
-  const target = await db.user.findUnique({ where: { id: userId } });
+  const {
+    userId,
+    email,
+    fullName,
+    githubUsername,
+    currentRole,
+    country,
+    batchId,
+  } = parsed.data;
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    include: { batch: true },
+  });
   if (!target) return { error: "That account no longer exists." };
 
   if (email !== target.email) {
@@ -126,10 +163,18 @@ export async function updateStudentAction(input: unknown) {
     if (clash) return { error: "Another account already uses that email." };
   }
 
+  const nextBatch =
+    batchId && batchId !== target.batchId
+      ? await db.batch.findUnique({ where: { id: batchId } })
+      : null;
+  if (batchId && batchId !== target.batchId && !nextBatch)
+    return { error: "That batch no longer exists. Pick another." };
+
   await db.user.update({
     where: { id: userId },
     data: {
       email,
+      ...(nextBatch ? { batchId: nextBatch.id } : {}),
       profile: {
         upsert: {
           create: {
@@ -149,8 +194,20 @@ export async function updateStudentAction(input: unknown) {
     },
   });
   await audit(admin.id, "student_updated", "User", userId, { email });
+  if (nextBatch) {
+    await audit(admin.id, "student_batch_changed", "User", userId, {
+      from: target.batch?.number ?? null,
+      to: nextBatch.number,
+    });
+    revalidatePath("/sessions");
+    revalidatePath("/materials");
+  }
   refreshStudentViews(userId);
-  return { success: "Student details saved." };
+  return {
+    success: nextBatch
+      ? `Student details saved. ${fullName} is now in ${batchLabel(nextBatch.number)}.`
+      : "Student details saved.",
+  };
 }
 
 export async function setStudentActiveAction(
@@ -223,7 +280,22 @@ export async function changeStudentRoleAction(userId: string, role: Role) {
   if (role === Role.STUDENT && (await isLastActiveAdmin(userId)))
     return { error: "The last active administrator cannot be demoted." };
 
-  await db.user.update({ where: { id: userId }, data: { role } });
+  // Every student belongs to a batch, so a demoted administrator without one
+  // joins the enrolling batch.
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { batchId: true },
+  });
+  const batch =
+    role === Role.STUDENT && !target?.batchId
+      ? await findEnrollingBatch(db)
+      : null;
+  if (role === Role.STUDENT && !target?.batchId && !batch)
+    return { error: "Create a batch first in Admin console → Batches." };
+  await db.user.update({
+    where: { id: userId },
+    data: { role, ...(batch ? { batchId: batch.id } : {}) },
+  });
   await audit(admin.id, "role_changed", "User", userId, { role });
   refreshStudentViews(userId);
   return {
@@ -312,5 +384,43 @@ export async function bulkStudentAction(
     success: `${done} ${done === 1 ? "account" : "accounts"} ${verb}.${
       skipped.length ? " The last administrator was left untouched." : ""
     }`,
+  };
+}
+
+export async function moveStudentsToBatchAction(
+  userIds: string[],
+  batchId: string,
+) {
+  const admin = await requireAdmin();
+  const batch = await db.batch.findUnique({ where: { id: batchId } });
+  if (!batch) return { error: "That batch no longer exists. Pick another." };
+
+  const students = await db.user.findMany({
+    where: { id: { in: userIds }, role: Role.STUDENT },
+    select: { id: true, batch: { select: { id: true, number: true } } },
+  });
+  const moving = students.filter((student) => student.batch?.id !== batch.id);
+  if (moving.length === 0)
+    return {
+      error: students.length
+        ? `Everyone selected is already in ${batchLabel(batch.number)}.`
+        : "Select at least one student.",
+    };
+
+  await db.user.updateMany({
+    where: { id: { in: moving.map((student) => student.id) } },
+    data: { batchId: batch.id },
+  });
+  for (const student of moving)
+    await audit(admin.id, "student_batch_changed", "User", student.id, {
+      from: student.batch?.number ?? null,
+      to: batch.number,
+    });
+
+  refreshStudentViews();
+  revalidatePath("/sessions");
+  revalidatePath("/materials");
+  return {
+    success: `${moving.length} ${pluralize(moving.length, "student")} moved to ${batchLabel(batch.number)}.`,
   };
 }

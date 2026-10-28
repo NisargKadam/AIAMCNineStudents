@@ -34,6 +34,8 @@ export type ShellUser = {
   email: string;
   role: "ADMIN" | "STUDENT";
   avatarUrl?: string | null;
+  /** "Batch 11" for a student; administrators sit outside batches. */
+  batch?: string | null;
 };
 
 export type ShellSignal = {
@@ -191,7 +193,11 @@ export function AppShell({
             </p>
             <p className="text-faint truncate text-[11px]">{user.email}</p>
           </div>
-          {user.role === "ADMIN" && <Badge tone="ember">Admin</Badge>}
+          {user.role === "ADMIN" ? (
+            <Badge tone="ember">Admin</Badge>
+          ) : (
+            user.batch && <Badge tone="halo">{user.batch}</Badge>
+          )}
         </div>
         <form action={logoutAction}>
           <Button
@@ -379,6 +385,11 @@ export function AppShell({
                     <p className="text-faint truncate text-[11px]">
                       {user.email}
                     </p>
+                    {user.role === "STUDENT" && user.batch && (
+                      <Badge tone="halo" className="mt-2">
+                        {user.batch}
+                      </Badge>
+                    )}
                   </div>
                   <DropdownPrimitive.Item asChild>
                     <Link

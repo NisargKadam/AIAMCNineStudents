@@ -17,29 +17,44 @@ export default async function CommunityPage({
   const user = await requireUser();
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
+  const batch = user.role === "STUDENT" ? user.batch : null;
   const view: FeedView =
-    params.view === "mine" || params.view === "saved" ? params.view : "all";
+    params.view === "mine" ||
+    params.view === "saved" ||
+    (params.view === "batch" && batch)
+      ? (params.view as FeedView)
+      : "all";
   const take = 10;
 
+  // The community is shared by every batch; "batch" narrows it to the
+  // viewer's batchmates.
   const where: Prisma.PostWhereInput =
     view === "mine"
       ? { userId: user.id }
       : view === "saved"
         ? { bookmarks: { some: { userId: user.id } } }
-        : {};
+        : view === "batch" && batch
+          ? { user: { batchId: batch.id, role: "STUDENT" } }
+          : {};
 
   const posts = await db.post.findMany({
     where,
     take: page * take + 1,
     orderBy: { createdAt: "desc" },
     include: {
-      user: { include: { profile: true } },
+      user: {
+        include: { profile: true, batch: { select: { number: true } } },
+      },
       likes: { where: { userId: user.id }, select: { id: true } },
       bookmarks: { where: { userId: user.id }, select: { id: true } },
       comments: {
         take: 8,
         orderBy: { createdAt: "asc" },
-        include: { user: { include: { profile: true } } },
+        include: {
+          user: {
+            include: { profile: true, batch: { select: { number: true } } },
+          },
+        },
       },
       _count: { select: { likes: true } },
     },
@@ -56,6 +71,7 @@ export default async function CommunityPage({
       />
       <CommunityFeed
         view={view}
+        batch={batch?.number ?? null}
         authorName={user.profile?.fullName ?? user.email}
         nextPage={hasMore ? page + 1 : null}
         posts={posts.slice(0, page * take).map((post) => ({
@@ -70,6 +86,10 @@ export default async function CommunityPage({
             role: post.user.role,
             avatarUrl: post.user.profile?.avatarUrl ?? null,
             githubUsername: post.user.profile?.githubUsername ?? null,
+            batch:
+              post.user.role === "STUDENT"
+                ? (post.user.batch?.number ?? null)
+                : null,
           },
           owned: post.userId === user.id || user.role === "ADMIN",
           authored: post.userId === user.id,
@@ -84,6 +104,10 @@ export default async function CommunityPage({
             author: {
               name: comment.user.profile?.fullName ?? comment.user.email,
               avatarUrl: comment.user.profile?.avatarUrl ?? null,
+              batch:
+                comment.user.role === "STUDENT"
+                  ? (comment.user.batch?.number ?? null)
+                  : null,
             },
           })),
         }))}

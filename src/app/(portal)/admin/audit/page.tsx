@@ -22,6 +22,8 @@ const notable = new Set([
   "student_access_recovered",
   "post_moderated",
   "comment_moderated",
+  "student_batch_changed",
+  "batch_deleted",
 ]);
 
 export default async function AuditPage({

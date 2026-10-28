@@ -41,3 +41,8 @@ export const submissionStatus: Record<
 export function pluralize(count: number, one: string, many?: string) {
   return count === 1 ? one : (many ?? `${one}s`);
 }
+
+/** How a batch is named everywhere in the portal: "Batch 11". */
+export function batchLabel(number: number) {
+  return `Batch ${number}`;
+}

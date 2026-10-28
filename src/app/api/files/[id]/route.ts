@@ -5,7 +5,8 @@ import { canAccessAdmin } from "@/lib/authorization";
 
 /**
  * Serves a file kept in the database. Everything requires a signed-in user;
- * session materials additionally stay hidden until the session is published.
+ * session materials additionally stay hidden until the session is published,
+ * and only students in that session's batch can download them.
  */
 export async function GET(
   request: Request,
@@ -18,13 +19,13 @@ export async function GET(
   const { id } = await params;
   const file = await db.storedFile.findUnique({
     where: { id },
-    include: { session: { select: { isActive: true } } },
+    include: { session: { select: { isActive: true, batchId: true } } },
   });
   if (!file) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (
     file.kind === "SESSION_MATERIAL" &&
-    !file.session?.isActive &&
-    !canAccessAdmin(user.role)
+    !canAccessAdmin(user.role) &&
+    (!file.session?.isActive || file.session.batchId !== user.batchId)
   )
     return NextResponse.json({ error: "Not found." }, { status: 404 });
 

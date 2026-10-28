@@ -5,6 +5,7 @@ import {
   FolderOpen,
   GraduationCap,
   Info,
+  Layers,
   LayoutDashboard,
   type LucideIcon,
   MessageSquare,
@@ -108,6 +109,12 @@ export const navSections: NavSection[] = [
         label: "Manage students",
         icon: GraduationCap,
         hint: "Add, edit, inspect, or remove accounts",
+      },
+      {
+        href: "/admin/batches",
+        label: "Batches",
+        icon: Layers,
+        hint: "Intakes, their schedules, and where new students go",
       },
       {
         href: "/admin/submissions",

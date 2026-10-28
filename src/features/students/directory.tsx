@@ -9,13 +9,16 @@ import {
   UsersRound,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tilt } from "@/components/motion/tilt";
+import { batchLabel } from "@/lib/utils";
 
 export type DirectoryEntry = {
   id: string;
+  batch: number | null;
   fullName: string;
   githubUsername: string | null;
   linkedinUrl: string | null;
@@ -25,7 +28,14 @@ export type DirectoryEntry = {
   avatarUrl: string | null;
 };
 
-export function StudentDirectory({ students }: { students: DirectoryEntry[] }) {
+export function StudentDirectory({
+  students,
+  showBatch = false,
+}: {
+  students: DirectoryEntry[];
+  /** Label each card with its batch when several batches are listed. */
+  showBatch?: boolean;
+}) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -79,9 +89,16 @@ export function StudentDirectory({ students }: { students: DirectoryEntry[] }) {
                     size="lg"
                   />
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-display text-ink truncate text-[15px] font-semibold">
-                      {student.fullName}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-display text-ink truncate text-[15px] font-semibold">
+                        {student.fullName}
+                      </h2>
+                      {showBatch && student.batch !== null && (
+                        <Badge tone="halo" className="shrink-0">
+                          {batchLabel(student.batch)}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-dim mt-1 truncate text-xs">
                       {student.currentRole ?? "Cohort member"}
                     </p>
@@ -132,8 +149,14 @@ export function StudentDirectory({ students }: { students: DirectoryEntry[] }) {
       ) : (
         <EmptyState
           icon={UsersRound}
-          title="Nobody matches that search"
-          description="Try a different name, role, or country — or clear the search to see the whole cohort."
+          title={
+            students.length ? "Nobody matches that search" : "Nobody here yet"
+          }
+          description={
+            students.length
+              ? "Try a different name, role, or country — or clear the search to see the whole cohort."
+              : "Profiles appear here as people in this batch join the portal."
+          }
         />
       )}
     </>

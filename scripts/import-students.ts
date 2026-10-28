@@ -2,7 +2,9 @@
  * Bulk-creates student accounts from CSV text.
  *
  * The file needs a `name` and an `email` column; order and extra columns do not
- * matter. Rows without an email are reported and skipped, and an email that
+ * matter. An optional `batch` column holds the batch number ("11"); rows
+ * without one join the enrolling batch. Rows without an email, or naming a
+ * batch that does not exist, are reported and skipped, and an email that
  * already has an account is left untouched, so the import is safe to re-run.
  *
  *   npm run db:import-students -- ./roster.csv
@@ -16,6 +18,7 @@
 import { readFileSync } from "node:fs";
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { findEnrollingBatch } from "../prisma/batches";
 
 /** Minimal CSV reader: quoted fields, doubled quotes, commas inside quotes. */
 export function parseCsv(text: string): string[][] {
@@ -80,6 +83,7 @@ export async function importStudents(prisma: PrismaClient, csv: string) {
   const header = rows[0].map((value) => value.trim().toLowerCase());
   const nameIndex = header.indexOf("name");
   const emailIndex = header.indexOf("email");
+  const batchIndex = header.indexOf("batch");
   if (nameIndex === -1 || emailIndex === -1)
     throw new Error(
       "The header row must contain a name column and an email column.",
@@ -90,9 +94,18 @@ export async function importStudents(prisma: PrismaClient, csv: string) {
     ? await prisma.user.findUnique({ where: { email: adminEmail } })
     : null;
 
+  const enrolling = await findEnrollingBatch(prisma);
+  const batches = new Map(
+    (await prisma.batch.findMany()).map((batch) => [
+      String(batch.number),
+      batch,
+    ]),
+  );
+
   const created: string[] = [];
   const existing: string[] = [];
   const skipped: string[] = [];
+  const unknownBatch: string[] = [];
 
   for (const row of rows.slice(1)) {
     const name = titleCase(row[nameIndex] ?? "");
@@ -110,11 +123,22 @@ export async function importStudents(prisma: PrismaClient, csv: string) {
       continue;
     }
 
+    // "11", "Batch 11", and "batch-11" all name Batch 11.
+    const batchText = (row[batchIndex] ?? "").match(/\d+/)?.[0];
+    const batch = batchText
+      ? batches.get(String(Number(batchText)))
+      : enrolling;
+    if (!batch) {
+      unknownBatch.push(`${name} (${row[batchIndex]?.trim() || "no batch"})`);
+      continue;
+    }
+
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash: await bcrypt.hash(password, 12),
         role: Role.STUDENT,
+        batchId: batch.id,
         profile: { create: { fullName: name } },
       },
     });
@@ -124,10 +148,10 @@ export async function importStudents(prisma: PrismaClient, csv: string) {
         action: "student_created",
         entityType: "User",
         entityId: user.id,
-        metadata: { email, source: "roster import" },
+        metadata: { email, source: "roster import", batch: batch.number },
       },
     });
-    created.push(`${name} <${email}>`);
+    created.push(`${name} <${email}> → Batch ${batch.number}`);
   }
 
   console.log(`Created ${created.length} accounts:`);
@@ -140,9 +164,18 @@ export async function importStudents(prisma: PrismaClient, csv: string) {
     console.log(
       `\nNo email address, so no account was created (${skipped.length}): ${skipped.join(", ")}`,
     );
+  if (unknownBatch.length)
+    console.log(
+      `\nNo such batch, so no account was created (${unknownBatch.length}): ${unknownBatch.join(", ")}`,
+    );
   console.log(`\nEveryone created signs in with DEFAULT_STUDENT_PASSWORD.`);
 
-  return { created: created.length, existing: existing.length, skipped };
+  return {
+    created: created.length,
+    existing: existing.length,
+    skipped,
+    unknownBatch,
+  };
 }
 
 if (process.argv[1]?.includes("import-students")) {

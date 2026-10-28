@@ -2,7 +2,8 @@ import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { assignments, categories, sessionCount } from "./curriculum";
 import { importStudents } from "../scripts/import-students";
-import { syncCurriculum } from "../scripts/sync-curriculum";
+import { ensureSessionSlots, syncCurriculum } from "../scripts/sync-curriculum";
+import { findEnrollingBatch } from "./batches";
 
 const prisma = new PrismaClient();
 
@@ -81,25 +82,27 @@ async function main() {
     });
   }
 
-  for (let sortOrder = 1; sortOrder <= sessionCount; sortOrder += 1) {
-    await prisma.cohortSession.upsert({
-      where: { sortOrder },
-      update: {},
-      create: { sortOrder, title: `Session ${sortOrder}` },
-    });
-  }
+  // Each batch keeps its own schedule. Only a batch with no sessions at all
+  // gets the numbered slots, so sessions an administrator removed stay gone.
+  const unscheduled = await prisma.batch.findMany({
+    where: { sessions: { none: {} } },
+    select: { id: true },
+  });
+  for (const batch of unscheduled) await ensureSessionSlots(prisma, batch.id);
 
   if (process.env.SEED_DEMO_DATA === "true") {
     const studentPassword = process.env.DEFAULT_STUDENT_PASSWORD;
     if (!studentPassword)
       throw new Error("DEFAULT_STUDENT_PASSWORD is required for demo data.");
     const demoHash = await bcrypt.hash(studentPassword, 12);
+    const batch = await findEnrollingBatch(prisma);
     await prisma.user.upsert({
       where: { email: "student@aiamc.dev" },
       update: {},
       create: {
         email: "student@aiamc.dev",
         passwordHash: demoHash,
+        batchId: batch?.id ?? null,
         profile: {
           create: {
             fullName: "Demo Student",
@@ -111,7 +114,7 @@ async function main() {
     });
   }
   console.log(
-    `Seed complete: 1 admin, ${categories.length} prerequisite categories, ${assignments.length} projects, ${sessionCount} sessions.`,
+    `Seed complete: 1 admin, ${categories.length} prerequisite categories, ${assignments.length} projects; ${sessionCount} session slots added to ${unscheduled.length} unscheduled ${unscheduled.length === 1 ? "batch" : "batches"}.`,
   );
 
   await runDeployTasks();

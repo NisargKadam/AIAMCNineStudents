@@ -103,9 +103,16 @@ describe("stored files", () => {
     await db.storedFile.delete({ where: { id: file.id } });
   });
   it("removes a session's materials when the session is deleted", async () => {
-    const max = await db.cohortSession.aggregate({ _max: { sortOrder: true } });
+    const batch = await db.batch.findFirstOrThrow({
+      orderBy: { number: "asc" },
+    });
+    const max = await db.cohortSession.aggregate({
+      where: { batchId: batch.id },
+      _max: { sortOrder: true },
+    });
     const session = await db.cohortSession.create({
       data: {
+        batchId: batch.id,
         title: `${suite} session`,
         sortOrder: (max._max.sortOrder ?? 0) + 100,
       },

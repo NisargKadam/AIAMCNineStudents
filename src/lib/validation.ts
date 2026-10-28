@@ -89,6 +89,8 @@ export const studentSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
   githubUsername: z.string().trim().max(39).optional(),
   password: z.string().min(12).max(200).optional().or(z.literal("")),
+  /** Omitted or blank means the enrolling batch. */
+  batchId: z.string().trim().max(64).optional(),
 });
 export const prerequisiteSchema = z.object({
   id: z.string().optional(),
@@ -135,6 +137,16 @@ export const studentUpdateSchema = z.object({
   githubUsername: z.string().trim().max(39).optional(),
   currentRole: z.string().trim().max(100).optional(),
   country: z.string().trim().max(80).optional(),
+  /** Omitted means the student stays in their current batch. */
+  batchId: z.string().trim().min(1).max(64).optional(),
+});
+export const batchSchema = z.object({
+  number: z.coerce
+    .number({ error: "Enter the batch number" })
+    .int("Use a whole number")
+    .min(1, "Batch numbers start at 1")
+    .max(999, "Use a number below 1000"),
+  isEnrolling: z.boolean().default(false),
 });
 export const adminPasswordSchema = z.object({
   userId: z.string().min(1),
@@ -152,6 +164,8 @@ const httpsUrl = z
 
 export const cohortSessionSchema = z.object({
   id: z.string().optional(),
+  /** Required for a new session; an existing session keeps its batch. */
+  batchId: z.string().min(1).max(64).optional(),
   title: z.string().trim().min(2).max(150),
   description: z.string().trim().max(1000).optional(),
   // A UTC instant resolved in the browser, so the administrator's timezone

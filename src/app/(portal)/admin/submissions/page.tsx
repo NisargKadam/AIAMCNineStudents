@@ -3,7 +3,8 @@ import { Prisma, SubmissionStatus } from "@prisma/client";
 import { ClipboardCheck, ExternalLink } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
-import { submissionStatus } from "@/lib/utils";
+import { resolveBatchFilter } from "@/lib/batches";
+import { batchLabel, submissionStatus } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +32,13 @@ export default async function SubmissionsPage({
     : undefined;
   const requestedPage =
     typeof params.page === "string" ? Number(params.page) : 1;
+  const batches = await db.batch.findMany({ orderBy: { number: "desc" } });
+  const batch = resolveBatchFilter(params.batch, batches);
   const where: Prisma.AssignmentSubmissionWhereInput = {
     ...(status ? { status } : {}),
+    ...(batch.batchId !== undefined
+      ? { user: { batchId: batch.batchId } }
+      : {}),
     ...(query
       ? {
           OR: [
@@ -63,7 +69,11 @@ export default async function SubmissionsPage({
     include: {
       assignment: { select: { title: true, isActive: true } },
       user: {
-        select: { email: true, profile: { select: { fullName: true } } },
+        select: {
+          email: true,
+          profile: { select: { fullName: true } },
+          batch: { select: { number: true } },
+        },
       },
     },
   });
@@ -71,6 +81,7 @@ export default async function SubmissionsPage({
     const search = new URLSearchParams({ page: String(value) });
     if (query) search.set("q", query);
     if (status) search.set("status", status);
+    if (batch.key !== "all") search.set("batch", batch.key);
     return `/admin/submissions?${search}`;
   }
 
@@ -112,8 +123,22 @@ export default async function SubmissionsPage({
               ))}
             </Select>
           </Field>
+          <Field label="Batch" htmlFor="submission-batch">
+            <Select
+              id="submission-batch"
+              name="batch"
+              defaultValue={batch.key === "all" ? "" : batch.key}
+            >
+              <option value="">All batches</option>
+              {batches.map((option) => (
+                <option key={option.id} value={option.number}>
+                  {batchLabel(option.number)}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Button type="submit">Apply filters</Button>
-          {(query || status) && (
+          {(query || status || batch.key !== "all") && (
             <Button variant="ghost" asChild>
               <Link href="/admin/submissions">Clear filters</Link>
             </Button>
@@ -140,6 +165,8 @@ export default async function SubmissionsPage({
                     </Link>
                     <p className="text-faint mt-1 text-xs break-all">
                       {submission.user.email}
+                      {submission.user.batch &&
+                        ` · ${batchLabel(submission.user.batch.number)}`}
                     </p>
                     <h2 className="font-display text-ink mt-3 text-base font-semibold">
                       {submission.assignment.title}

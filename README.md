@@ -14,6 +14,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 - Database-driven, categorized prerequisite checklist with search, open-only filtering, progress persistence, and configuration-version reconfirmation
 - Session materials: instructors upload slides, PDFs, and documents per session for students to download
 - Student profiles with photo upload, a public cohort directory with search, and AES-256-GCM encrypted OpenAI API keys
+- Batches: every student belongs to one intake (Batch 9, Batch 11, …), each batch has its own live-session schedule and materials, and new students join the enrolling batch
 - Sessions page for the fifteen live classes: administrators post the join link and the YouTube recording, students can open both but never edit them
 - Ten seeded, administrator-editable projects with GitHub validation, status filtering, and review lifecycle tracking
 - Community feed with text, images, external/GitHub links, likes, comments, bookmarks, saved and authored views, inline editing, ownership controls, pagination, and moderation
@@ -110,8 +111,10 @@ bumps the checklist version so students reconfirm:
 npm run db:sync-curriculum
 ```
 
-Create accounts in bulk from a CSV with `name` and `email` columns. Rows without
-an email are reported and skipped, and an email that already has an account is
+Create accounts in bulk from a CSV with `name` and `email` columns. An optional
+`batch` column (`11` or `Batch 11`) places each row in a batch; rows without one
+join the enrolling batch. Rows without an email, or naming a batch that does not
+exist, are reported and skipped, and an email that already has an account is
 left alone, so the import is safe to re-run:
 
 ```bash
@@ -143,6 +146,30 @@ Both steps are safe to leave running: the import skips emails that already have
 an account, and the sync is idempotent.
 
 Production deployment uses `prisma migrate deploy`, never `db push`. The first migration lives in `prisma/migrations`.
+
+## Batches
+
+Each intake of the masterclass is a batch. Everyone enrolled before batches
+existed is **Batch 9**; **Batch 11** is the enrolling batch, so every student
+added from the console or a roster import joins it unless an administrator picks
+another one.
+
+| Separate per batch                              | Shared by every batch                        |
+| ----------------------------------------------- | -------------------------------------------- |
+| Students and the roster tabs in Manage students | The ten projects and the readiness checklist |
+| Sessions: dates, join links, recordings         | The community feed (filterable to one batch) |
+| Session materials (downloads are batch-checked) | Administrator accounts, which have no batch  |
+| Overview metrics and the submissions filter     |                                              |
+
+**Admin Console → Batches** shows every batch with its students, sessions, and
+submissions, creates the next batch, and chooses which one new students join. A
+new batch starts with the latest batch's session titles but none of its dates,
+links, recordings, or files. Only an empty batch can be deleted. Students move
+between batches from **Manage students**, one at a time from the edit form or in
+bulk with **Move to batch**; their work and progress move with them.
+
+Students see their batch in the sidebar and on the dashboard, their own batch's
+sessions and materials only, and a directory that opens on their batchmates.
 
 ## Admin setup and student authentication
 
