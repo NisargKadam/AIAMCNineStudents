@@ -6,6 +6,20 @@ import { requireAdmin, requireUser } from "@/lib/auth/session";
 import { commentSchema, postSchema } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 import { canMutateOwnedResource } from "@/lib/authorization";
+import { visiblePeople } from "@/lib/batches";
+
+/** A student can only react to posts from their batchmates and instructors. */
+async function canSeePost(
+  user: Parameters<typeof visiblePeople>[0],
+  postId: string,
+) {
+  const people = visiblePeople(user);
+  const post = await db.post.findFirst({
+    where: { id: postId, ...(people ? { user: people } : {}) },
+    select: { id: true },
+  });
+  return post !== null;
+}
 
 export async function createPostAction(input: unknown) {
   const user = await requireUser();
@@ -59,6 +73,7 @@ export async function moderatePostAction(id: string) {
 }
 export async function toggleLikeAction(postId: string) {
   const user = await requireUser();
+  if (!(await canSeePost(user, postId))) return { liked: false };
   const key = { userId_postId: { userId: user.id, postId } };
   const existing = await db.postLike.findUnique({ where: key });
   if (existing) await db.postLike.delete({ where: key });
@@ -68,6 +83,7 @@ export async function toggleLikeAction(postId: string) {
 }
 export async function toggleBookmarkAction(postId: string) {
   const user = await requireUser();
+  if (!(await canSeePost(user, postId))) return { bookmarked: false };
   const key = { userId_postId: { userId: user.id, postId } };
   const existing = await db.bookmark.findUnique({ where: key });
   if (existing) await db.bookmark.delete({ where: key });
@@ -79,6 +95,8 @@ export async function addCommentAction(input: unknown) {
   const user = await requireUser();
   const parsed = commentSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+  if (!(await canSeePost(user, parsed.data.postId)))
+    return { error: "That post is no longer available." };
   await db.postComment.create({
     data: {
       userId: user.id,

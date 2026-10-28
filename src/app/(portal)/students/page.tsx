@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
+import { canAccessAdmin } from "@/lib/authorization";
 import { resolveBatchFilter } from "@/lib/batches";
 import { batchLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
@@ -20,83 +21,93 @@ export default async function StudentsPage({
   searchParams: Promise<{ batch?: string }>;
 }) {
   const user = await requireUser();
-  const batches = await db.batch.findMany({
-    orderBy: { number: "desc" },
-    include: { _count: { select: { students: { where: listed } } } },
-  });
-  // Students open on their own batch; every batch is one tab away.
-  const own = user.batch ? String(user.batch.number) : "all";
-  const filter = resolveBatchFilter((await searchParams).batch ?? own, batches);
-  const viewing = batches.find((batch) => batch.id === filter.batchId);
+  const isAdmin = canAccessAdmin(user.role);
 
-  const students = await db.user.findMany({
-    where: {
-      ...listed,
-      ...(filter.batchId !== undefined ? { batchId: filter.batchId } : {}),
-    },
-    orderBy: { profile: { fullName: "asc" } },
-    select: {
-      id: true,
-      batch: { select: { number: true } },
-      profile: {
-        select: {
-          fullName: true,
-          githubUsername: true,
-          linkedinUrl: true,
-          currentRole: true,
-          country: true,
-          bio: true,
-          avatarUrl: true,
-        },
-      },
-    },
-  });
+  // A student only ever sees their own batch; `?batch=` is ignored for them.
+  // Administrators can browse every batch.
+  const batches = isAdmin
+    ? await db.batch.findMany({
+        orderBy: { number: "desc" },
+        include: { _count: { select: { students: { where: listed } } } },
+      })
+    : [];
+  const filter = isAdmin
+    ? resolveBatchFilter((await searchParams).batch, batches)
+    : { key: "own", batchId: user.batchId };
+  const viewing = isAdmin
+    ? batches.find((batch) => batch.id === filter.batchId)
+    : user.batch;
+
+  const students =
+    isAdmin || user.batchId
+      ? await db.user.findMany({
+          where: {
+            ...listed,
+            ...(filter.batchId !== undefined
+              ? { batchId: filter.batchId }
+              : {}),
+          },
+          orderBy: { profile: { fullName: "asc" } },
+          select: {
+            id: true,
+            batch: { select: { number: true } },
+            profile: {
+              select: {
+                fullName: true,
+                githubUsername: true,
+                linkedinUrl: true,
+                currentRole: true,
+                country: true,
+                bio: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        })
+      : [];
+
+  const label = viewing ? batchLabel(viewing.number) : null;
 
   return (
     <>
       <PageHeader
-        eyebrow={
-          viewing
-            ? `Cohort directory · ${batchLabel(viewing.number)}`
-            : "Cohort directory"
-        }
+        eyebrow={label ? `Cohort directory · ${label}` : "Cohort directory"}
         title="Meet the builders"
         description={
-          viewing && viewing.id === user.batchId
-            ? `Everyone learning and shipping alongside you in ${batchLabel(viewing.number)}. Only what people choose to share appears here.`
-            : viewing
-              ? `The builders of ${batchLabel(viewing.number)}. Only what people choose to share appears here.`
-              : "Builders from every batch of the masterclass. Only what people choose to share appears here."
+          isAdmin
+            ? label
+              ? `Everyone in ${label}. Students only ever see their own batch here.`
+              : "Every student in every batch. Students only ever see their own batch here."
+            : label
+              ? `Everyone learning and shipping alongside you in ${label}. Only what people choose to share appears here.`
+              : "You are not in a batch yet, so there is nobody to show. Ask your instructor to add you to one."
         }
       />
-      {batches.length > 0 && (
+      {isAdmin && batches.length > 0 && (
         <LinkTabs
           className="mb-5"
           active={filter.key}
           tabs={[
-            ...batches.map((batch) => ({
-              key: String(batch.number),
-              label:
-                batch.id === user.batchId
-                  ? `${batchLabel(batch.number)} · yours`
-                  : batchLabel(batch.number),
-              href: `/students?batch=${batch.number}`,
-              count: batch._count.students,
-            })),
             {
               key: "all",
-              label: "Everyone",
-              href: "/students?batch=all",
+              label: "All batches",
+              href: "/students",
               count: batches.reduce(
                 (sum, batch) => sum + batch._count.students,
                 0,
               ),
             },
+            ...batches.map((batch) => ({
+              key: String(batch.number),
+              label: batchLabel(batch.number),
+              href: `/students?batch=${batch.number}`,
+              count: batch._count.students,
+            })),
           ]}
         />
       )}
       <StudentDirectory
-        showBatch={!viewing}
+        showBatch={isAdmin && !viewing}
         students={students.flatMap((student) =>
           student.profile
             ? [

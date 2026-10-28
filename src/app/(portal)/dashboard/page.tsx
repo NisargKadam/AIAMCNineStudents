@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ArrowUpRight, Check, Heart, MessageSquare } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
+import { visiblePeople } from "@/lib/batches";
 import {
   batchLabel,
   firstName,
@@ -40,6 +41,8 @@ export default async function DashboardPage() {
         select: { assignmentId: true, status: true },
       }),
       db.post.findMany({
+        // The same audience as the community feed: batchmates and instructors.
+        where: { user: visiblePeople(user) ?? {} },
         take: 4,
         orderBy: { createdAt: "desc" },
         include: {

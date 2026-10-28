@@ -14,7 +14,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 - Database-driven, categorized prerequisite checklist with search, open-only filtering, progress persistence, and configuration-version reconfirmation
 - Session materials: instructors upload slides, PDFs, and documents per session for students to download
 - Student profiles with photo upload, a public cohort directory with search, and AES-256-GCM encrypted OpenAI API keys
-- Batches: every student belongs to one intake (Batch 9, Batch 11, …), each batch has its own live-session schedule and materials, and new students join the enrolling batch
+- Batches: every student belongs to one intake (Batch 9, Batch 11, …), sees only their own batch's people, community, sessions, and materials, and new students join the enrolling batch
 - Sessions page for the fifteen live classes: administrators post the join link and the YouTube recording, students can open both but never edit them
 - Ten seeded, administrator-editable projects with GitHub validation, status filtering, and review lifecycle tracking
 - Community feed with text, images, external/GitHub links, likes, comments, bookmarks, saved and authored views, inline editing, ownership controls, pagination, and moderation
@@ -154,12 +154,13 @@ existed is **Batch 9**; **Batch 11** is the enrolling batch, so every student
 added from the console or a roster import joins it unless an administrator picks
 another one.
 
-| Separate per batch                              | Shared by every batch                        |
-| ----------------------------------------------- | -------------------------------------------- |
-| Students and the roster tabs in Manage students | The ten projects and the readiness checklist |
-| Sessions: dates, join links, recordings         | The community feed (filterable to one batch) |
-| Session materials (downloads are batch-checked) | Administrator accounts, which have no batch  |
-| Overview metrics and the submissions filter     |                                              |
+| Separate per batch                                    | Shared by every batch                        |
+| ----------------------------------------------------- | -------------------------------------------- |
+| Students, the directory, and the Manage students tabs | The ten projects and the readiness checklist |
+| Community posts and comments (instructors reach all)  | Administrator accounts, which have no batch  |
+| Sessions: dates, join links, recordings               |                                              |
+| Session materials (downloads are batch-checked)       |                                              |
+| Overview metrics and the submissions filter           |                                              |
 
 **Admin Console → Batches** shows every batch with its students, sessions, and
 submissions, creates the next batch, and chooses which one new students join. A
@@ -168,8 +169,11 @@ links, recordings, or files. Only an empty batch can be deleted. Students move
 between batches from **Manage students**, one at a time from the edit form or in
 bulk with **Move to batch**; their work and progress move with them.
 
-Students see their batch in the sidebar and on the dashboard, their own batch's
-sessions and materials only, and a directory that opens on their batchmates.
+A student never sees anyone from another batch: the directory lists only their
+batchmates, and the community feed, its comments, and the dashboard's recent
+posts show only their batchmates and the instructors. They also see only their
+own batch's sessions and materials, and their batch in the sidebar and on the
+dashboard. Administrators see every batch, with batch labels and filters.
 
 ## Admin setup and student authentication
 

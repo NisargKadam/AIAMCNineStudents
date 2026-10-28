@@ -49,7 +49,7 @@ export type FeedPost = {
     role: "ADMIN" | "STUDENT";
     avatarUrl: string | null;
     githubUsername: string | null;
-    /** The author's batch number; null for instructors. */
+    /** The author's batch, shown to administrators; null otherwise. */
     batch: number | null;
   };
   owned: boolean;
@@ -66,7 +66,7 @@ export type FeedPost = {
   }>;
 };
 
-export type FeedView = "all" | "batch" | "mine" | "saved";
+export type FeedView = "all" | "mine" | "saved";
 
 function Composer({ authorName }: { authorName: string }) {
   const [pending, start] = useTransition();
@@ -531,20 +531,14 @@ export function CommunityFeed({
   nextPage,
   view,
   authorName,
-  batch,
 }: {
   posts: FeedPost[];
   nextPage: number | null;
   view: FeedView;
   authorName: string;
-  /** The viewer's batch number, which adds a feed of just that batch. */
-  batch: number | null;
 }) {
   const views: Array<{ key: FeedView; label: string }> = [
     { key: "all", label: "Everything" },
-    ...(batch !== null
-      ? [{ key: "batch" as const, label: batchLabel(batch) }]
-      : []),
     { key: "mine", label: "My posts" },
     { key: "saved", label: "Saved" },
   ];
@@ -580,18 +574,14 @@ export function CommunityFeed({
               ? "Nothing saved yet"
               : view === "mine"
                 ? "You have not posted yet"
-                : view === "batch" && batch !== null
-                  ? `Nobody in ${batchLabel(batch)} has posted yet`
-                  : "The feed is empty"
+                : "The feed is empty"
           }
           description={
             view === "saved"
               ? "Bookmark a post and it will wait for you here."
               : view === "mine"
                 ? "Share a build note, a blocker, or something you learned this week."
-                : view === "batch"
-                  ? "Posts from your batchmates collect here. Share yours from Everything."
-                  : "Be the first to share what you are building."
+                : "Be the first to share what you are building."
           }
           action={
             view !== "all" ? (

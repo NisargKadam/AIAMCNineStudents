@@ -19,10 +19,16 @@ import {
   setEnrollingBatchAction,
 } from "@/features/admin/batch-actions";
 import { upsertSessionAction } from "@/features/sessions/actions";
+import {
+  addCommentAction,
+  toggleLikeAction,
+} from "@/features/community/actions";
 import { importStudents } from "../scripts/import-students";
 import { GET as getFile } from "@/app/api/files/[id]/route";
 import SessionsPage from "@/app/(portal)/sessions/page";
 import AdminStudentsPage from "@/app/(portal)/admin/students/page";
+import StudentsPage from "@/app/(portal)/students/page";
+import CommunityPage from "@/app/(portal)/community/page";
 
 vi.mock("@/lib/auth/session", () => ({
   requireAdmin: vi.fn(),
@@ -33,6 +39,13 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/features/admin/student-manager", () => ({
   StudentManager: ({ students }: { students: unknown }) =>
     JSON.stringify(students),
+}));
+vi.mock("@/features/students/directory", () => ({
+  StudentDirectory: ({ students }: { students: unknown }) =>
+    JSON.stringify(students),
+}));
+vi.mock("@/features/community/community-feed", () => ({
+  CommunityFeed: ({ posts }: { posts: unknown }) => JSON.stringify(posts),
 }));
 
 const suite = `batches-${Date.now()}`;
@@ -354,6 +367,99 @@ describe("per-batch schedules", () => {
     const other = await download({ id: "y", role: "STUDENT", batchId: B.id });
     const admin = await download({ id: adminId, role: "ADMIN", batchId: null });
     expect([own.status, other.status, admin.status]).toEqual([200, 404, 200]);
+  });
+});
+
+describe("who a student can see", () => {
+  const signedIn = (id: string) =>
+    db.user.findUniqueOrThrow({
+      where: { id },
+      include: { profile: true, batch: true },
+    });
+
+  it("lists only the student's own batch in the directory, whatever the URL asks for", async () => {
+    const [mate] = await Promise.all([
+      student("mate", A.id),
+      student("outsider", B.id),
+    ]);
+    vi.mocked(requireUser).mockResolvedValueOnce(
+      (await signedIn(mate.id)) as never,
+    );
+    const html = renderToStaticMarkup(
+      await StudentsPage({
+        searchParams: Promise.resolve({ batch: String(B.number) }),
+      }),
+    );
+    expect(html).toContain(`${suite} mate`);
+    expect(html).not.toContain(`${suite} outsider`);
+    expect(html).not.toContain("/students?batch=");
+
+    vi.mocked(requireUser).mockResolvedValueOnce(
+      (await signedIn(adminId)) as never,
+    );
+    const adminView = renderToStaticMarkup(
+      await StudentsPage({
+        searchParams: Promise.resolve({ batch: String(B.number) }),
+      }),
+    );
+    expect(adminView).toContain(`${suite} outsider`);
+    expect(adminView).not.toContain(`${suite} mate`);
+  });
+
+  it("shows a student only their batchmates' and instructors' posts and comments", async () => {
+    const [mate, outsider] = await Promise.all([
+      student("poster-a", A.id),
+      student("poster-b", B.id),
+    ]);
+    const [, theirs, announcement] = await Promise.all([
+      db.post.create({ data: { userId: mate.id, content: `${suite} from A` } }),
+      db.post.create({
+        data: { userId: outsider.id, content: `${suite} from B` },
+      }),
+      db.post.create({
+        data: { userId: adminId, content: `${suite} from instructor` },
+      }),
+    ]);
+    await db.postComment.createMany({
+      data: [
+        {
+          postId: announcement.id,
+          userId: outsider.id,
+          content: `${suite} B replied`,
+        },
+        {
+          postId: announcement.id,
+          userId: mate.id,
+          content: `${suite} A replied`,
+        },
+      ],
+    });
+
+    vi.mocked(requireUser).mockResolvedValue(
+      (await signedIn(mate.id)) as never,
+    );
+    const html = renderToStaticMarkup(
+      await CommunityPage({ searchParams: Promise.resolve({}) }),
+    );
+    expect(html).toContain(`${suite} from A`);
+    expect(html).toContain(`${suite} from instructor`);
+    expect(html).toContain(`${suite} A replied`);
+    expect(html).not.toContain(`${suite} from B`);
+    expect(html).not.toContain(`${suite} B replied`);
+
+    const blocked = await addCommentAction({
+      postId: theirs.id,
+      content: "Hello from another batch",
+    });
+    expect(blocked.error).toBe("That post is no longer available.");
+    expect(await toggleLikeAction(theirs.id)).toEqual({ liked: false });
+    expect(await db.postLike.count({ where: { postId: theirs.id } })).toBe(0);
+    const allowed = await addCommentAction({
+      postId: announcement.id,
+      content: `${suite} A replied again`,
+    });
+    expect(allowed.success).toBe(true);
+    vi.mocked(requireUser).mockReset();
   });
 });
 

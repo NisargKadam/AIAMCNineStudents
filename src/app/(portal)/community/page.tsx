@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
+import { visiblePeople } from "@/lib/batches";
+import { batchLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import {
   CommunityFeed,
@@ -17,25 +19,22 @@ export default async function CommunityPage({
   const user = await requireUser();
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
-  const batch = user.role === "STUDENT" ? user.batch : null;
+  const isAdmin = user.role === "ADMIN";
   const view: FeedView =
-    params.view === "mine" ||
-    params.view === "saved" ||
-    (params.view === "batch" && batch)
-      ? (params.view as FeedView)
-      : "all";
+    params.view === "mine" || params.view === "saved" ? params.view : "all";
   const take = 10;
 
-  // The community is shared by every batch; "batch" narrows it to the
-  // viewer's batchmates.
-  const where: Prisma.PostWhereInput =
-    view === "mine"
+  // Each batch has its own community: a student sees posts and comments from
+  // their batchmates and the instructors only. Administrators see every batch.
+  const people = visiblePeople(user);
+  const where: Prisma.PostWhereInput = {
+    ...(people ? { user: people } : {}),
+    ...(view === "mine"
       ? { userId: user.id }
       : view === "saved"
         ? { bookmarks: { some: { userId: user.id } } }
-        : view === "batch" && batch
-          ? { user: { batchId: batch.id, role: "STUDENT" } }
-          : {};
+        : {}),
+  };
 
   const posts = await db.post.findMany({
     where,
@@ -48,6 +47,7 @@ export default async function CommunityPage({
       likes: { where: { userId: user.id }, select: { id: true } },
       bookmarks: { where: { userId: user.id }, select: { id: true } },
       comments: {
+        where: people ? { user: people } : {},
         take: 8,
         orderBy: { createdAt: "asc" },
         include: {
@@ -67,11 +67,16 @@ export default async function CommunityPage({
       <PageHeader
         eyebrow="Cohort network"
         title="Community"
-        description="Share what you build, ask sharper questions, and help the cohort move forward together."
+        description={
+          isAdmin
+            ? "Every batch's community in one feed. Students only see posts and comments from their own batch and the instructors."
+            : user.batch
+              ? `Share what you build with ${batchLabel(user.batch.number)} and your instructors. Only your batch sees what you post here.`
+              : "Share what you build, ask sharper questions, and help the cohort move forward together."
+        }
       />
       <CommunityFeed
         view={view}
-        batch={batch?.number ?? null}
         authorName={user.profile?.fullName ?? user.email}
         nextPage={hasMore ? page + 1 : null}
         posts={posts.slice(0, page * take).map((post) => ({
@@ -87,7 +92,7 @@ export default async function CommunityPage({
             avatarUrl: post.user.profile?.avatarUrl ?? null,
             githubUsername: post.user.profile?.githubUsername ?? null,
             batch:
-              post.user.role === "STUDENT"
+              isAdmin && post.user.role === "STUDENT"
                 ? (post.user.batch?.number ?? null)
                 : null,
           },
@@ -105,7 +110,7 @@ export default async function CommunityPage({
               name: comment.user.profile?.fullName ?? comment.user.email,
               avatarUrl: comment.user.profile?.avatarUrl ?? null,
               batch:
-                comment.user.role === "STUDENT"
+                isAdmin && comment.user.role === "STUDENT"
                   ? (comment.user.batch?.number ?? null)
                   : null,
             },
