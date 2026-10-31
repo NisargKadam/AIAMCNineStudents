@@ -267,7 +267,10 @@ export function ExamBoard({
                 try {
                   const r = await startExamAction();
                   if (r.error) toast.error(r.error);
-                  else router.refresh();
+                  else {
+                    setConfirm(false);
+                    router.refresh();
+                  }
                 } catch {
                   toast.error("Could not start the exam. Try again.");
                 }

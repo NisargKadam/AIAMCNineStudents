@@ -215,6 +215,7 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run test:e2e # runs against the production build
 ```
 
 GitHub Actions provisions PostgreSQL 17 and runs install, client generation, migrations, lint, type checking, all tests, and the production build on pushes and pull requests.

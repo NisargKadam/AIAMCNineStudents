@@ -127,6 +127,7 @@ test("student exam, autosave, Python, failure, retry, expiry, certificate, and a
   await expect(
     page.getByText("FAIL · Keep building", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.getByRole("button", { name: "Try again", exact: true }).click();
   await page.getByRole("button", { name: "Start my 150 minutes" }).click();
   await expect(page.getByRole("timer")).toBeVisible();
