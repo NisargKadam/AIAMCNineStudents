@@ -31,6 +31,8 @@ model User {
   updatedAt                DateTime                  @updatedAt
   batch                    Batch?                    @relation(fields: [batchId], references: [id], onDelete: Restrict)
   profile                  StudentProfile?
+  examAttempts             ExamAttempt[]
+  certificate              ExamCertificate?
   sessions                 Session[]
   prerequisites            StudentPrerequisite[]
   prerequisiteConfirmation PrerequisiteConfirmation?
@@ -305,4 +307,42 @@ model StoredFile {
   session      CohortSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
+}
+
+enum ExamStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+model ExamAttempt {
+  id          String           @id @default(cuid())
+  userId      String
+  version     String
+  number      Int
+  status      ExamStatus       @default(IN_PROGRESS)
+  startedAt   DateTime         @default(now())
+  deadline    DateTime
+  submittedAt DateTime?
+  layout      Json
+  answers     Json             @default("{}")
+  score       Int?
+  passed      Boolean          @default(false)
+  breakdown   Json?
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificate ExamCertificate?
+
+  @@unique([userId, version, number])
+  @@index([status, deadline])
+  @@index([userId, startedAt(sort: Desc)])
+}
+
+model ExamCertificate {
+  id        String      @id @default(uuid())
+  userId    String      @unique
+  attemptId String      @unique
+  name      String      @db.VarChar(100)
+  issuedAt  DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt   ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 }

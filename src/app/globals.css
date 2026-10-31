@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Certificate Name";
+  src: url("/fonts/noto-sans.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Certificate Signature";
+  src: url("/fonts/great-vibes.ttf") format("truetype");
+  font-display: swap;
+}
+.certificate-name {
+  font-family: "Certificate Name", sans-serif;
+}
+.certificate-signature {
+  font-family: "Certificate Signature", cursive;
+}
+
 /* ------------------------------------------------------------------
    AI AMC Student Platform — "Deck" design system
    The portal is an instrument deck: layered panels at real depth, one
