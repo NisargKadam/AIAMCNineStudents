@@ -18,7 +18,7 @@ export default defineConfig({
         "base64",
       ),
     },
-    command: "npm run dev -- --port 3001",
+    command: "npm run start -- --port 3001",
     url: "http://localhost:3001/api/health",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

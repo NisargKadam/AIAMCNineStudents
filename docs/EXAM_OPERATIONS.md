@@ -40,7 +40,9 @@ Automated Vitest tests always use `tests/exam-fixture.ts`, a clearly fictional
 bank with different IDs and examples. The Playwright-managed server also uses
 that fixture; when reusing an existing local server it tests that server's bank
 using only its public question interface. Neither test suite contains course
-answers. Run `npm test`, `npm run test:e2e`, lint, typecheck, and build as usual.
+answers. Run `npm test`, lint, typecheck, and build as usual. Run
+`npm run test:e2e` after the production build; its managed server uses the
+production runtime to cover state preservation across Server Action refreshes.
 
 ## Timing, storage, and scoring
 
