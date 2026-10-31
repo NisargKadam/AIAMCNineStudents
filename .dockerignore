@@ -9,3 +9,6 @@ coverage
 npm-debug.log*
 README.md
 docs
+.private
+playwright-report
+test-results

@@ -23,6 +23,7 @@ The AI AMC Student Platform is a production-minded student community and learnin
 - Student records that mirror the whole student portal for an administrator: overview, readiness, assignments, community activity, and account history
 - Administrators can create, edit, activate, deactivate, promote, demote, set passwords for, delete, and bulk-manage accounts, and export the filtered roster as CSV
 - Command palette (`⌘K` / `Ctrl+K`) for keyboard navigation across every page
+- Certification exam: 150 minutes, 40 MCQs, two Python code repairs, one coding challenge, and two sequence tasks; randomized attempts, private grading, 90% pass threshold, retries after failure, and signed PDF certificates with LinkedIn sharing
 - Dark and light themes that persist per browser and apply before first paint
 - Depth-based interface with a fixed navigation rail, 3D page transitions, pointer-driven parallax on the dashboard deck and directory, keyboard focus states, loading/error/empty states, and mobile drawer navigation
 - PostgreSQL migrations, repeatable seed, CI, Docker, Cloudinary storage adapter, and Railway configuration
@@ -66,17 +67,18 @@ If Docker is unavailable, install PostgreSQL 16+ locally, create a database/user
 
 Copy `.env.example`; never commit `.env`.
 
-| Variable                         | Purpose                                                        |
-| -------------------------------- | -------------------------------------------------------------- |
-| `DATABASE_URL`                   | PostgreSQL connection string                                   |
-| `AUTH_SECRET`                    | Authentication secret generated with `openssl rand -base64 32` |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment              |
-| `DEFAULT_STUDENT_PASSWORD`       | Initial password assigned to admin-created students            |
-| `FIELD_ENCRYPTION_KEY`           | Exactly 32 random bytes in base64 for AES-256-GCM              |
-| `NEXT_PUBLIC_APP_NAME`           | Public product name                                            |
-| `APP_URL`                        | Canonical application URL                                      |
-| `CLOUDINARY_*`                   | Optional; sends images to Cloudinary instead of PostgreSQL     |
-| `SEED_DEMO_DATA`                 | Creates a demo student only when exactly `true`                |
+| Variable                         | Purpose                                                               |
+| -------------------------------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`                   | PostgreSQL connection string                                          |
+| `AUTH_SECRET`                    | Authentication secret generated with `openssl rand -base64 32`        |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial administrator seeded from the environment                     |
+| `DEFAULT_STUDENT_PASSWORD`       | Initial password assigned to admin-created students                   |
+| `FIELD_ENCRYPTION_KEY`           | Exactly 32 random bytes in base64 for AES-256-GCM                     |
+| `NEXT_PUBLIC_APP_NAME`           | Public product name                                                   |
+| `APP_URL`                        | Canonical application URL                                             |
+| `EXAM_BANK_BASE64`               | Private server-only assessment definition; never commit the real bank |
+| `CLOUDINARY_*`                   | Optional; sends images to Cloudinary instead of PostgreSQL            |
+| `SEED_DEMO_DATA`                 | Creates a demo student only when exactly `true`                       |
 
 Generate secrets:
 
@@ -202,6 +204,9 @@ docs/                  deployment operations
 ```
 
 ## Testing and quality
+
+See [Exam operations](docs/EXAM_OPERATIONS.md) for private assessment setup,
+grading, instructor access, timing behavior, and certificate verification.
 
 PostgreSQL must be available for integration tests. `vitest.config.mts` reads `.env`, so the same commands work locally and in CI.
 

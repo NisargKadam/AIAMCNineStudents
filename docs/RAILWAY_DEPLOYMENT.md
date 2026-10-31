@@ -26,6 +26,7 @@ DEFAULT_STUDENT_PASSWORD=<cohort initial password>
 NEXT_PUBLIC_APP_NAME=AI AMC Student Platform
 APP_URL=https://<your-railway-domain>
 SEED_DEMO_DATA=false
+EXAM_BANK_BASE64=<private gzip-compressed assessment JSON encoded as base64>
 ```
 
 Generate the two cryptographic secrets locally:
@@ -36,6 +37,11 @@ openssl rand -base64 32
 ```
 
 `FIELD_ENCRYPTION_KEY` must decode to exactly 32 bytes. Preserve it in a secure password manager: changing it makes existing encrypted API keys unreadable.
+
+`EXAM_BANK_BASE64` is private assessment content, never a committed seed. See
+[Exam operations](EXAM_OPERATIONS.md) for validation, storage, and versioning.
+Set it before deploying the exam feature. Do not replace the definition for an
+existing version while students have attempts tied to it.
 
 ## 4. Deploy and migrate
 

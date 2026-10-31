@@ -64,6 +64,12 @@ export const navSections: NavSection[] = [
         hint: "Submit GitHub work and read feedback",
       },
       {
+        href: "/exam",
+        label: "Exam",
+        icon: GraduationCap,
+        hint: "Timed assessment and your AI AMC certification",
+      },
+      {
         href: "/profile",
         label: "My profile",
         icon: UserRound,
@@ -121,6 +127,12 @@ export const navSections: NavSection[] = [
         label: "Submissions",
         icon: ClipboardCheck,
         hint: "View and review all student submissions",
+      },
+      {
+        href: "/admin/exam",
+        label: "Exam console",
+        icon: GraduationCap,
+        hint: "Student scores, certificates, and private answer key",
       },
       {
         href: "/admin/assignments",

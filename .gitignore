@@ -42,3 +42,6 @@ yarn-error.log*
 next-env.d.ts
 *.roster.csv
 roster*.csv
+/playwright-report/
+/test-results/
+/.private/
