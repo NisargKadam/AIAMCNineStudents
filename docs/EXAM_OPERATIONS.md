@@ -36,6 +36,12 @@ student DTO privacy. It reports aggregate results without printing questions or
 answers. This command needs the real runtime variable (the local `.env` is
 loaded automatically).
 
+The validator also reviews correct-answer length ranks and the expected score
+from choosing only the longest/shortest option by characters or words (ties
+count fairly). A strong length cue or extreme within-question length spread
+fails validation. Editorial review must still check distractor plausibility,
+parallel phrasing, and whether exactly one option answers the question.
+
 Automated Vitest tests always use `tests/exam-fixture.ts`, a clearly fictional
 bank with different IDs and examples. The Playwright-managed server also uses
 that fixture; when reusing an existing local server it tests that server's bank
@@ -94,6 +100,13 @@ Engineer**, certified by **Nisarg Kadam**, with a stylized digital signature,
 issue date, assessment score, credential ID, and verification URL. The signature
 is a visual issuer mark, not a PKI PDF signature. Noto Sans and Great Vibes are
 bundled with their Open Font Licenses.
+
+Certificate records (name, issue date, user, attempt, and credential ID) live in
+PostgreSQL. PDFs are generated on demand by
+`src/features/exam/certificate.ts` through the authenticated download route;
+there is no persistent PDF directory on Railway. Local sample exports belong
+under the Git-ignored `output/pdf/` folder. A sample rendering is clearly marked
+as a design preview and does not create an issued certificate record.
 
 The public `/certificates/[id]` page shows the chosen name, achievement, issue
 date, and credential ID. It exposes no email, account ID, answers, or detailed

@@ -31,6 +31,7 @@ export async function supportsCertificateName(name: string) {
 export async function createCertificatePDF(
   certificate: { id: string; name: string; issuedAt: Date },
   score: number,
+  options: { sample?: boolean } = {},
 ) {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -86,6 +87,7 @@ export async function createCertificatePDF(
     });
   }
   text("AI AMC  /  AGENTIC AI MASTERCLASS", 516, 11, bold, gold);
+  if (options.sample) text("SAMPLE - DESIGN PREVIEW", 540, 8, bold, gold);
   text("Certificate of Completion", 462, 36, serif);
   text("THIS CERTIFIES THAT", 427, 9, bold, muted);
   const nameSize = Math.min(
@@ -165,9 +167,32 @@ export async function createCertificatePDF(
     font: sans,
     color: muted,
   });
-  const url = verificationUrl(certificate.id);
-  text(`Credential ID: ${certificate.id}`, 65, 7, sans, muted);
-  text(url, 52, Math.min(7, 730 / sans.widthOfTextAtSize(url, 1)), sans, muted);
+  if (options.sample) {
+    text(
+      "Sample layout only - no credential has been issued.",
+      65,
+      8,
+      bold,
+      gold,
+    );
+    text(
+      "Issued certificates include a unique credential ID and public verification URL.",
+      52,
+      7,
+      sans,
+      muted,
+    );
+  } else {
+    const url = verificationUrl(certificate.id);
+    text(`Credential ID: ${certificate.id}`, 65, 7, sans, muted);
+    text(
+      url,
+      52,
+      Math.min(7, 730 / sans.widthOfTextAtSize(url, 1)),
+      sans,
+      muted,
+    );
+  }
   doc.setTitle(`AI Agentic MasterClass Certification - ${certificate.name}`);
   doc.setAuthor("Nisarg Kadam | AI AMC");
   doc.setSubject("AI Agentic MasterClass Certified - AI & LLM Expert Engineer");

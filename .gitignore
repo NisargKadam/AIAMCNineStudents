@@ -45,3 +45,4 @@ roster*.csv
 /playwright-report/
 /test-results/
 /.private/
+/output/
