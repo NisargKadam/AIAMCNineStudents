@@ -12,3 +12,4 @@ docs
 .private
 playwright-report
 test-results
+output

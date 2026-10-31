@@ -8,10 +8,16 @@ import {
 } from "../src/features/exam/engine";
 import { checkPython } from "../src/features/exam/python";
 import { EXAM_VERSION, type Answers } from "../src/features/exam/types";
+import { reviewOptionBalance } from "../src/features/exam/option-review";
 
 async function main() {
   loadEnvConfig(process.cwd());
   const bank = bankForVersion(EXAM_VERSION);
+  const review = reviewOptionBalance(bank);
+  if (review.hasLengthCue)
+    throw new Error(
+      "MCQ options need an editorial review for answer-length clues.",
+    );
   const answers: Answers = Object.fromEntries(
     bank.map((q) => [q.id, q.solution ?? q.correct!]),
   );
@@ -46,6 +52,15 @@ async function main() {
     throw new Error("Private field in a student DTO.");
   console.log(
     "Private assessment verified: 45 questions, 100 points, all reference solutions and public examples pass; 90 passes, 89 fails; no answer-key fields in student payloads.",
+  );
+  console.log(
+    `Option review: correct-answer character-length ranks ${review.lengthRanks.map((n) => n.toFixed(1)).join(" / ")}; length-only expected scores ${Object.values(
+      review.guessRates,
+    )
+      .map((rate) => `${(rate * 100).toFixed(1)}%`)
+      .join(
+        " / ",
+      )}; largest option-length ratio ${review.maxCharacterSpread.toFixed(2)}.`,
   );
 }
 main().catch(() => {
