@@ -2,7 +2,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   token: null as string | null,
+  /** What arrives as X-Forwarded-For, which a caller can write themselves. */
   ip: "test-ip",
+  /** What the host reports as the real client address, when it does. */
+  realIp: null as string | null,
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -17,7 +20,11 @@ vi.mock("next/headers", () => ({
     set: vi.fn(),
     delete: vi.fn(),
   }),
-  headers: async () => new Headers({ "x-forwarded-for": state.ip }),
+  headers: async () =>
+    new Headers({
+      "x-forwarded-for": state.ip,
+      ...(state.realIp ? { "x-real-ip": state.realIp } : {}),
+    }),
 }));
 
 import { randomBytes } from "node:crypto";
@@ -34,6 +41,11 @@ import {
 } from "@/features/admin/signup-actions";
 import { signupAction } from "@/features/signup/actions";
 import { loginAction } from "@/features/auth/actions";
+import {
+  bulkStudentAction,
+  deleteStudentAction,
+} from "@/features/admin/actions";
+import { MAX_WAITING_REQUESTS } from "@/features/signup/service";
 
 const suite = `alumni-signup-${Date.now()}`;
 const password = "correct-horse-battery-1";
@@ -44,6 +56,7 @@ let ipCounter = 0;
 function freshIp() {
   ipCounter += 1;
   state.ip = `${suite}-ip-${ipCounter}`;
+  state.realIp = null;
 }
 
 function form(fields: Record<string, string>) {
@@ -236,6 +249,78 @@ describe("sign-up refuses", () => {
       error: expect.stringContaining("Too many"),
     });
     expect(await requestFor("flood")).toBeNull();
+  });
+});
+
+describe("the limits on public forms", () => {
+  it("counts sign-ups by the address the host reports, not one the caller writes", async () => {
+    freshIp();
+    state.realIp = `${suite}-real-1`;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      state.ip = `${suite}-forged-${attempt}`;
+      expect(await signup("member")).toMatchObject({ code: "exists" });
+    }
+    state.ip = `${suite}-forged-again`;
+    expect(await signup("member")).toMatchObject({
+      error: expect.stringContaining("Too many"),
+    });
+  });
+
+  it("uses the nearest proxy's entry when the host reports no address", async () => {
+    freshIp();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      state.ip = `${suite}-forged-b${attempt}, ${suite}-proxy-seen`;
+      expect(await signup("member")).toMatchObject({ code: "exists" });
+    }
+    state.ip = `${suite}-forged-b-again, ${suite}-proxy-seen`;
+    expect(await signup("member")).toMatchObject({
+      error: expect.stringContaining("Too many"),
+    });
+  });
+
+  it("throttles sign-in guesses the same way", async () => {
+    freshIp();
+    state.realIp = `${suite}-real-2`;
+    const guess = () =>
+      loginAction(
+        null,
+        form({ email: address("member"), password: "wrong-guess-123" }),
+      );
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      state.ip = `${suite}-forged-c${attempt}`;
+      expect(await guess()).toEqual({ error: "Invalid email or password." });
+    }
+    state.ip = `${suite}-forged-c-again`;
+    expect(await guess()).toEqual({
+      error: expect.stringContaining("Too many sign-in attempts"),
+    });
+  });
+
+  it("stops taking new requests once the waiting list is full, without closing the door on pre-approved emails", async () => {
+    await db.preapprovedEmail.create({
+      data: { email: address("late-listed") },
+    });
+    await db.signupRequest.createMany({
+      data: Array.from({ length: MAX_WAITING_REQUESTS }, (_, index) => ({
+        email: address(`queue-${index}`),
+        fullName: "Queued Person",
+        alumniBatch: 1,
+        passwordHash: "unused-test-fixture",
+      })),
+    });
+    try {
+      freshIp();
+      expect(await signup("one-too-many")).toMatchObject({
+        error: expect.stringContaining("paused"),
+      });
+      expect(await requestFor("one-too-many")).toBeNull();
+      freshIp();
+      await expect(signup("late-listed")).rejects.toThrow("REDIRECT:/welcome");
+    } finally {
+      await db.signupRequest.deleteMany({
+        where: { email: { startsWith: `${suite}-queue-` } },
+      });
+    }
   });
 });
 
@@ -482,5 +567,82 @@ describe("the instructor's sign-up requests", () => {
     expect(
       await db.preapprovedEmail.count({ where: { email: address("sneaky") } }),
     ).toBe(0);
+  });
+});
+
+describe("the instructor's controls hold under pressure", () => {
+  let token = "";
+
+  beforeAll(async () => {
+    const admin = await db.user.create({
+      data: {
+        email: address("second-instructor"),
+        passwordHash: "unused-test-fixture",
+        role: "ADMIN",
+        profile: { create: { fullName: "Second Instructor" } },
+      },
+    });
+    token = randomBytes(32).toString("base64url");
+    await db.session.create({
+      data: {
+        userId: admin.id,
+        tokenHash: hashSessionToken(token),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    });
+  });
+
+  it("answers both clicks when a request is approved twice at once", async () => {
+    state.token = token;
+    const request = await db.signupRequest.create({
+      data: {
+        email: address("double-click"),
+        fullName: "Double Click",
+        alumniBatch: 2,
+        passwordHash: "unused-test-fixture",
+      },
+    });
+    const results = await Promise.all([
+      approveSignupAction(request.id),
+      approveSignupAction(request.id),
+    ]);
+    expect(results.filter((result) => "success" in result)).toHaveLength(1);
+    expect(results.filter((result) => "error" in result)).toHaveLength(1);
+    expect(
+      await db.user.count({ where: { email: address("double-click") } }),
+    ).toBe(1);
+  });
+
+  it("takes a deleted account's email off the pre-approved list, so it cannot walk straight back in", async () => {
+    state.token = token;
+    for (const name of ["impostor", "impostor-bulk"]) {
+      await db.preapprovedEmail.create({ data: { email: address(name) } });
+      await db.user.create({
+        data: {
+          email: address(name),
+          passwordHash: "unused-test-fixture",
+          alumniBatch: 5,
+          profile: { create: { fullName: `${suite} ${name}` } },
+        },
+      });
+    }
+    const single = await userFor("impostor");
+    const bulk = await userFor("impostor-bulk");
+
+    const result = await deleteStudentAction(single!.id);
+    expect(result.success).toContain("pre-approved");
+    await bulkStudentAction([bulk!.id], "delete");
+    expect(
+      await db.preapprovedEmail.count({
+        where: {
+          email: { in: [address("impostor"), address("impostor-bulk")] },
+        },
+      }),
+    ).toBe(0);
+
+    state.token = null;
+    freshIp();
+    expect(await signup("impostor")).toHaveProperty("pending");
+    expect(await userFor("impostor")).toBeNull();
   });
 });

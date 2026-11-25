@@ -57,6 +57,13 @@ import AdminStudentPage from "@/app/(portal)/admin/students/[id]/page";
 import AdminBatchesPage from "@/app/(portal)/admin/batches/page";
 import AdminPage from "@/app/(portal)/admin/page";
 import AdminExamPage from "@/app/(portal)/admin/exam/page";
+import AdminAttemptPage from "@/app/(portal)/admin/exam/[id]/page";
+import AdminAuditPage from "@/app/(portal)/admin/audit/page";
+import AdminCommunityPage from "@/app/(portal)/admin/community/page";
+import AdminAssignmentsPage from "@/app/(portal)/admin/assignments/page";
+import AdminPrerequisitesPage from "@/app/(portal)/admin/prerequisites/page";
+import AdminSubmissionsPage from "@/app/(portal)/admin/submissions/page";
+import AdminSignupsPage from "@/app/(portal)/admin/signups/page";
 import { GET as getFile } from "@/app/api/files/[id]/route";
 import SessionsPage from "@/app/(portal)/sessions/page";
 import MaterialsPage from "@/app/(portal)/materials/page";
@@ -737,5 +744,54 @@ describe("the admin console and alumni", () => {
     );
     expect(directory).toContain(ids.get("student"));
     expect(directory).not.toContain(ids.get("alumna7"));
+  });
+});
+
+describe("every admin page guards itself", () => {
+  // A layout is not re-run for every request, so each page must refuse on its
+  // own rather than lean on the admin layout above it.
+  const someId = { params: Promise.resolve({ id: "anything" }) };
+  const pages: Array<[string, () => Promise<unknown>]> = [
+    ["overview", () => AdminPage(noParams)],
+    ["students", () => AdminStudentsPage(noParams)],
+    ["student record", () => AdminStudentPage({ ...someId, ...noParams })],
+    ["sign-up requests", () => AdminSignupsPage(noParams)],
+    ["batches", () => AdminBatchesPage()],
+    ["submissions", () => AdminSubmissionsPage(noParams)],
+    ["exam console", () => AdminExamPage(noParams)],
+    ["exam attempt", () => AdminAttemptPage(someId)],
+    ["curriculum", () => AdminAssignmentsPage()],
+    ["readiness", () => AdminPrerequisitesPage()],
+    ["moderation", () => AdminCommunityPage()],
+    ["audit log", () => AdminAuditPage(noParams)],
+  ];
+
+  it.each(pages)(
+    "turns a current student away from %s",
+    async (_name, open) => {
+      actAs("student");
+      await expect(open()).rejects.toThrow("REDIRECT:/unauthorized");
+    },
+  );
+
+  it.each(pages)("turns an alumnus away from %s", async (_name, open) => {
+    actAs("alumna7");
+    await expect(open()).rejects.toThrow("REDIRECT:/unauthorized");
+  });
+
+  it.each(pages)(
+    "sends a signed-out visitor to sign in from %s",
+    async (_name, open) => {
+      actAs(null);
+      await expect(open()).rejects.toThrow("REDIRECT:/login");
+    },
+  );
+});
+
+describe("the welcome step and a running exam", () => {
+  it("sends a student whose exam is running back to it instead of holding them", async () => {
+    await startExam(ids.get("midexam")!);
+    actAs("midexam");
+    await expect(WelcomePage()).rejects.toThrow("REDIRECT:/exam");
   });
 });

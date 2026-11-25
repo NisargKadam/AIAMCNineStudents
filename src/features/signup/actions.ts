@@ -2,13 +2,13 @@
 
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { clientAddress } from "@/lib/auth/client-address";
 import { createSession } from "@/lib/auth/session";
 import { signupSchema } from "@/lib/validation";
-import { createAlumniUser } from "./service";
+import { createAlumniUser, MAX_WAITING_REQUESTS } from "./service";
 
 export type SignupState =
   | null
@@ -64,9 +64,7 @@ export async function signupAction(
 
   // Every submission counts, so the form cannot be used to probe which emails
   // have accounts or to flood the instructor's queue.
-  const ip =
-    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const identifier = `signup:${ip}`;
+  const identifier = `signup:${await clientAddress()}`;
   const recent = await db.loginAttempt.count({
     where: { identifier, attemptedAt: { gte: new Date(Date.now() - HOUR) } },
   });
@@ -88,11 +86,21 @@ export async function signupAction(
   const request = await db.signupRequest.findUnique({ where: { email } });
   if (request) return request.status === "DECLINED" ? declined : waiting;
 
-  const passwordHash = await bcrypt.hash(password, 12);
   const preapproved = await db.preapprovedEmail.findUnique({
     where: { email },
   });
+  if (!preapproved) {
+    const waitingCount = await db.signupRequest.count({
+      where: { status: "PENDING" },
+    });
+    if (waitingCount >= MAX_WAITING_REQUESTS)
+      return {
+        error:
+          "Sign-ups from new emails are paused for the moment. Please contact your instructor directly.",
+      };
+  }
 
+  const passwordHash = await bcrypt.hash(password, 12);
   if (!preapproved) {
     try {
       const created = await db.signupRequest.create({

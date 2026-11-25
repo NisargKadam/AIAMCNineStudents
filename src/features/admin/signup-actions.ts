@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
 import { audit } from "@/lib/audit";
@@ -14,6 +15,29 @@ const gone = {
   error: "That request is no longer there. It may already have been handled.",
 };
 
+const taken = {
+  error:
+    "That email already has an account, so the request was removed. Nothing about the account changed.",
+};
+
+/**
+ * Approves one request. An account created for the same email at the very
+ * same moment makes the insert fail; that is reported like any other email
+ * that already has an account, never thrown.
+ */
+async function approve(id: string) {
+  try {
+    return await db.$transaction((tx) => approveRequest(tx, id));
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    )
+      return "exists" as const;
+    throw error;
+  }
+}
+
 function refresh() {
   revalidatePath("/admin/signups");
   revalidatePath("/admin/students");
@@ -24,14 +48,10 @@ function refresh() {
 export async function approveSignupAction(id: string): Promise<Result> {
   const admin = await requireAdmin();
   if (typeof id !== "string") return gone;
-  const outcome = await db.$transaction((tx) => approveRequest(tx, id));
+  const outcome = await approve(id);
   refresh();
   if (outcome === "missing") return gone;
-  if (outcome === "exists")
-    return {
-      error:
-        "That email already has an account, so the request was removed. Nothing about the account changed.",
-    };
+  if (outcome === "exists") return taken;
   await audit(admin.id, "signup_approved", "User", outcome.userId, {
     email: outcome.email,
     alumniBatch: outcome.alumniBatch,
@@ -118,9 +138,7 @@ export async function addPreapprovedEmailsAction(
   let approved = 0;
   for (const request of requests) {
     if (request.status !== "PENDING") continue;
-    const outcome = await db.$transaction((tx) =>
-      approveRequest(tx, request.id),
-    );
+    const outcome = await approve(request.id);
     if (typeof outcome !== "object") continue;
     approved += 1;
     await audit(admin.id, "signup_approved", "User", outcome.userId, {

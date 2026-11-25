@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { CommunityModeration } from "@/features/admin/community-moderation";
 export const metadata = { title: "Community Moderation" };
 export default async function AdminCommunityPage() {
+  // Guarded here as well as in the layout: a layout is not re-run for every
+  // request, so it cannot be the only thing standing in front of this page.
+  await requireAdmin();
   const posts = await db.post.findMany({
     take: 100,
     orderBy: { createdAt: "desc" },

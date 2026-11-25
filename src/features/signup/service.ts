@@ -4,6 +4,13 @@ import type { Prisma } from "@prisma/client";
 type Tx = Prisma.TransactionClient;
 
 /**
+ * How many requests may wait for the instructor at once. A flood of sign-ups
+ * from made-up emails stops here instead of burying the real ones;
+ * pre-approved emails never join this queue, so they are unaffected.
+ */
+export const MAX_WAITING_REQUESTS = 100;
+
+/**
  * Creates a certification-only account. The batch is the one the person says
  * they studied in, so the account never joins a live batch.
  */
@@ -37,7 +44,11 @@ export async function approveRequest(tx: Tx, requestId: string) {
     where: { id: requestId },
   });
   if (!request) return "missing" as const;
-  await tx.signupRequest.delete({ where: { id: requestId } });
+  // Two approvals at once both read the request; only one removes it.
+  const removed = await tx.signupRequest.deleteMany({
+    where: { id: requestId },
+  });
+  if (removed.count === 0) return "missing" as const;
   const taken = await tx.user.findUnique({
     where: { email: request.email },
     select: { id: true },

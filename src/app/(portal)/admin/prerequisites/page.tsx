@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { PrerequisiteManager } from "@/features/admin/prerequisite-manager";
 export const metadata = { title: "Prerequisites Manager" };
 export default async function AdminPrerequisitesPage() {
+  // Guarded here as well as in the layout: a layout is not re-run for every
+  // request, so it cannot be the only thing standing in front of this page.
+  await requireAdmin();
   const [categories, config] = await Promise.all([
     db.prerequisiteCategory.findMany({
       orderBy: { sortOrder: "asc" },

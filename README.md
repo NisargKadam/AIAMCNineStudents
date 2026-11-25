@@ -197,6 +197,9 @@ them, in the menu and on the server.
   administrator approves or declines it. Waiting requests also appear in the
   bell menu and on the admin overview. A declined person is told so when they
   sign in and stays declined until approved from **Declined**.
+- Sign-ups are limited to 10 an hour per address, and at most 100 requests
+  can wait at once; pre-approved emails are never held up by that queue.
+  Deleting an account also takes its email off the pre-approved list.
 - The portal sends no email. An approved person finds out by signing in with
   the password they chose, and a pre-approved email is not proof of ownership,
   so deactivate an account that turns out to be someone else's.

@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { AssignmentManager } from "@/features/admin/assignment-manager";
 export const metadata = { title: "Assignments Manager" };
 export default async function AdminAssignmentsPage() {
+  // Guarded here as well as in the layout: a layout is not re-run for every
+  // request, so it cannot be the only thing standing in front of this page.
+  await requireAdmin();
   const assignments = await db.assignment.findMany({
     orderBy: { sortOrder: "asc" },
     include: { _count: { select: { submissions: true } } },

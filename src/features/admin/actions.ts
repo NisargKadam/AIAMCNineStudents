@@ -326,6 +326,20 @@ export async function changeStudentRoleAction(userId: string, role: Role) {
   };
 }
 
+/**
+ * Deletes an account and takes its email off the pre-approved list. Without
+ * that, someone removed for signing up as another person could sign straight
+ * back up with the same email. Returns whether the email had been listed.
+ */
+async function removeAccount(target: { id: string; email: string }) {
+  const [, unlisted] = await db.$transaction([
+    db.user.delete({ where: { id: target.id } }),
+    db.preapprovedEmail.deleteMany({ where: { email: target.email } }),
+  ]);
+  revalidatePath("/admin/signups");
+  return unlisted.count > 0;
+}
+
 export async function deleteStudentAction(userId: string) {
   const admin = await requireAdmin();
   if (userId === admin.id)
@@ -344,12 +358,16 @@ export async function deleteStudentAction(userId: string) {
     email: target.email,
     fullName: target.profile?.fullName ?? null,
   });
-  await db.user.delete({ where: { id: userId } });
+  const unlisted = await removeAccount(target);
 
   refreshStudentViews();
   revalidatePath("/community");
   return {
-    success: `${target.profile?.fullName ?? target.email} and all of their portal data were deleted.`,
+    success: `${target.profile?.fullName ?? target.email} and all of their portal data were deleted.${
+      unlisted
+        ? " Their email was also taken off the pre-approved list, so a new sign-up from it will wait for your approval."
+        : ""
+    }`,
   };
 }
 
@@ -378,7 +396,7 @@ export async function bulkStudentAction(
         email: target.email,
         fullName: target.profile?.fullName ?? null,
       });
-      await db.user.delete({ where: { id: userId } });
+      await removeAccount(target);
     } else {
       const isActive = operation === "activate";
       await db.user.update({ where: { id: userId }, data: { isActive } });

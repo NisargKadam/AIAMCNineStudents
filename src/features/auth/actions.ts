@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { loginSchema, passwordResetRequestSchema } from "@/lib/validation";
+import { clientAddress } from "@/lib/auth/client-address";
 import {
   createSession,
   destroySession,
@@ -17,9 +17,7 @@ export async function loginAction(_: unknown, formData: FormData) {
     remember: formData.get("remember") === "on",
   });
   if (!parsed.success) return { error: "Enter a valid email and password." };
-  const forwarded =
-    (await headers()).get("x-forwarded-for")?.split(",")[0] ?? "local";
-  const identifier = `${forwarded}:${parsed.data.email}`;
+  const identifier = `${await clientAddress()}:${parsed.data.email}`;
   const recentFailures = await db.loginAttempt.count({
     where: {
       identifier,
