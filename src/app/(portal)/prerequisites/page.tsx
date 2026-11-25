@@ -1,10 +1,10 @@
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireFullAccess } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { PrerequisiteChecklist } from "@/features/prerequisites/checklist";
 export const metadata = { title: "Prerequisites" };
 export default async function PrerequisitesPage() {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const [categories, confirmation, config] = await Promise.all([
     db.prerequisiteCategory.findMany({
       where: { isActive: true },

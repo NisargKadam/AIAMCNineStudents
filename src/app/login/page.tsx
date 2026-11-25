@@ -1,5 +1,12 @@
 import { redirect } from "next/navigation";
-import { BookOpenCheck, ClipboardCheck, MessageSquare } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Award,
+  BookOpenCheck,
+  ClipboardCheck,
+  MessageSquare,
+} from "lucide-react";
 import { Brand } from "@/components/brand";
 import { LoginForm } from "@/features/auth/login-form";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -116,7 +123,28 @@ export default async function LoginPage() {
 
           <LoginForm />
 
-          <p className="text-faint mt-10 text-center text-[11px] leading-5">
+          <Link
+            href="/signup"
+            className="group hover:border-ember/60 mt-6 flex items-center gap-3.5 rounded-2xl border border-[var(--line-strong)] bg-[var(--sunken)] p-4 transition-colors"
+          >
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--caution)_14%,transparent)] text-[var(--caution)]">
+              <Award size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="text-ink block text-sm font-semibold">
+                Studied in Batch 1 to 10?
+              </span>
+              <span className="text-dim mt-0.5 block text-xs leading-5">
+                Sign up to take the exam and earn your certificate.
+              </span>
+            </span>
+            <ArrowRight
+              size={16}
+              className="text-faint group-hover:text-ember shrink-0 transition-[color,transform] group-hover:translate-x-0.5"
+            />
+          </Link>
+
+          <p className="text-faint mt-8 text-center text-[11px] leading-5">
             Sessions are protected with HTTP-only cookies and can be revoked by
             an administrator at any time.
           </p>

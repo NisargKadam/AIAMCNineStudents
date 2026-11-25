@@ -40,7 +40,11 @@ export default async function AdminBatchesPage() {
         where: { isActive: true, scheduledAt: { gt: now } },
         _min: { scheduledAt: true },
       }),
-      db.user.count({ where: { role: "STUDENT", batchId: null } }),
+      // Alumni sit outside the live batches on purpose, so they are not
+      // students who still need one.
+      db.user.count({
+        where: { role: "STUDENT", batchId: null, alumniBatch: null },
+      }),
     ]);
   const submissions = await Promise.all(
     batches.map((batch) =>

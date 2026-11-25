@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
-import { ArrowUpRight, Check, Heart, MessageSquare } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
-import { visiblePeople } from "@/lib/batches";
+import { isAlumni } from "@/lib/access";
 import {
   batchLabel,
   firstName,
@@ -12,15 +11,19 @@ import {
 } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/avatar";
+import { AlumniHome } from "@/features/dashboard/alumni-home";
 import { ProgressDeck } from "@/features/dashboard/progress-deck";
+import { RecentPosts } from "@/features/dashboard/recent-posts";
 
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [prereqTotal, prereqDone, assignments, submissions, recentPosts] =
-    await Promise.all([
+  // An alumnus has no coursework, so their home is built around the exam.
+  if (isAlumni(user)) return <AlumniHome user={user} />;
+
+  const [prereqTotal, prereqDone, assignments, submissions] = await Promise.all(
+    [
       db.prerequisite.count({
         where: { isActive: true, category: { isActive: true } },
       }),
@@ -40,17 +43,8 @@ export default async function DashboardPage() {
         where: { userId: user.id },
         select: { assignmentId: true, status: true },
       }),
-      db.post.findMany({
-        // The same audience as the community feed: batchmates and instructors.
-        where: { user: visiblePeople(user) ?? {} },
-        take: 4,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: { include: { profile: true } },
-          _count: { select: { likes: true, comments: true } },
-        },
-      }),
-    ]);
+    ],
+  );
 
   const byAssignment = new Map(submissions.map((s) => [s.assignmentId, s]));
   const approved = submissions.filter((s) => s.status === "COMPLETED").length;
@@ -204,62 +198,11 @@ export default async function DashboardPage() {
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
-        <Card className="p-5 sm:p-6">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="font-display text-ink text-sm font-semibold">
-              What the cohort is working on
-            </h2>
-            <Link
-              href="/community"
-              className="text-dim hover:text-ink flex items-center gap-1 text-xs transition-colors"
-            >
-              Open feed
-              <ArrowUpRight size={13} />
-            </Link>
-          </div>
-          {recentPosts.length ? (
-            <div className="divide-y divide-[var(--line)]">
-              {recentPosts.map((post) => (
-                <article key={post.id} className="flex gap-3 py-3.5 first:pt-0">
-                  <Avatar
-                    name={post.user.profile?.fullName ?? post.user.email}
-                    url={post.user.profile?.avatarUrl}
-                    size="sm"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-ink truncate text-xs font-semibold">
-                        {post.user.profile?.fullName ?? post.user.email}
-                      </p>
-                      <span className="text-faint shrink-0 text-[11px]">
-                        {formatDistanceToNow(post.createdAt, {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                    <p className="text-dim mt-1 line-clamp-2 text-xs leading-5">
-                      {post.content ?? post.linkUrl ?? "Shared an image"}
-                    </p>
-                  </div>
-                  <div className="text-faint flex shrink-0 items-center gap-3 text-[11px]">
-                    <span className="flex items-center gap-1">
-                      <Heart size={11} />
-                      {post._count.likes}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageSquare size={11} />
-                      {post._count.comments}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="text-dim py-10 text-center text-sm">
-              Nothing shared yet. Post the first build note.
-            </p>
-          )}
-        </Card>
+        <RecentPosts
+          user={user}
+          title="What the cohort is working on"
+          empty="Nothing shared yet. Post the first build note."
+        />
 
         <Card className="relative flex flex-col justify-between overflow-hidden p-6">
           <span

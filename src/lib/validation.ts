@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALUMNI_BATCHES } from "@/lib/access";
 
 const webUrl = z.url({ protocol: /^https?$/ }).max(500);
 const optionalUrl = z.union([z.literal(""), webUrl]).optional();
@@ -7,6 +8,35 @@ const storedFilePath = z
   .string()
   .regex(/^\/api\/files\/[a-z0-9]+$/, "Upload the file again")
   .max(500);
+/**
+ * The portal's password rule, as the checks a form can tick off one by one.
+ * `newPassword` enforces the same three on the server.
+ */
+export const passwordRules = [
+  {
+    key: "length",
+    label: "12 or more characters",
+    test: (value: string) => value.length >= 12,
+  },
+  {
+    key: "letter",
+    label: "A letter",
+    test: (value: string) => /[a-z]/i.test(value),
+  },
+  {
+    key: "number",
+    label: "A number",
+    test: (value: string) => /\d/.test(value),
+  },
+] as const;
+export const newPassword = z
+  .string()
+  .min(12, "Use at least 12 characters")
+  .max(200)
+  .refine(
+    (value) => /[a-z]/i.test(value) && /\d/.test(value),
+    "Include at least one letter and one number",
+  );
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
   password: z.string().min(1).max(200),
@@ -14,6 +44,26 @@ export const loginSchema = z.object({
 });
 export const passwordResetRequestSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
+});
+/** The public sign-up form for students of the batches before the portal. */
+export const signupSchema = z.object({
+  alumniBatch: z.coerce
+    .number({ error: "Choose the batch you were in" })
+    .refine(
+      (value) => ALUMNI_BATCHES.includes(value),
+      "Choose the batch you were in",
+    ),
+  fullName: z
+    .string({ error: "Enter your full name" })
+    .trim()
+    .min(2, "Enter your full name")
+    .max(100),
+  email: z
+    .string({ error: "Enter a valid email address" })
+    .trim()
+    .toLowerCase()
+    .pipe(z.email("Enter a valid email address").max(254)),
+  password: z.string({ error: "Choose a password" }).pipe(newPassword),
 });
 export const profileSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
@@ -37,6 +87,23 @@ export const profileSchema = z.object({
   avatarUrl: z.union([optionalUrl, storedFilePath]),
   openAiApiKey: z.string().trim().max(300).optional(),
   removeApiKey: z.boolean().optional(),
+});
+/**
+ * What every student must have before using the portal: a photo, their name,
+ * what they do, and where they are. Administrators keep the optional schema.
+ */
+export const studentProfileSchema = profileSchema.extend({
+  fullName: z.string().trim().min(2, "Enter your full name").max(100),
+  currentRole: z.string().trim().min(2, "Add your current role").max(100),
+  country: z.string().trim().min(2, "Add your country").max(80),
+  avatarUrl: z.union([webUrl, storedFilePath], {
+    error: "Add a profile photo",
+  }),
+});
+/** The welcome step asks for the same profile, minus the API key card. */
+export const welcomeSchema = studentProfileSchema.omit({
+  openAiApiKey: true,
+  removeApiKey: true,
 });
 export const githubUrlSchema = z
   .url()
@@ -116,14 +183,7 @@ export const reviewSchema = z.object({
 export const passwordChangeSchema = z
   .object({
     currentPassword: z.string().min(1).max(200),
-    newPassword: z
-      .string()
-      .min(12, "Use at least 12 characters")
-      .max(200)
-      .refine(
-        (value) => /[a-z]/i.test(value) && /\d/.test(value),
-        "Include at least one letter and one number",
-      ),
+    newPassword,
     confirmPassword: z.string().min(1, "Confirm your new password").max(200),
   })
   .refine((value) => value.newPassword === value.confirmPassword, {

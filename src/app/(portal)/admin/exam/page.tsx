@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
+import { memberBadge } from "@/lib/access";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,12 @@ export default async function AdminExamPage({
   await finalizeExpiredExams();
   const params = await searchParams;
   const page = Math.max(1, Math.min(100000, Number(params.page) || 1));
-  const where = params.batch ? { user: { batchId: params.batch } } : {};
+  const where =
+    params.batch === "alumni"
+      ? { user: { alumniBatch: { not: null } } }
+      : params.batch
+        ? { user: { batchId: params.batch } }
+        : {};
   const [attempts, total, passed, active, certificates, batches] =
     await Promise.all([
       db.examAttempt.findMany({
@@ -29,6 +35,8 @@ export default async function AdminExamPage({
           user: {
             select: {
               email: true,
+              role: true,
+              alumniBatch: true,
               profile: { select: { fullName: true } },
               batch: { select: { number: true } },
             },
@@ -87,6 +95,7 @@ export default async function AdminExamPage({
                   Batch {b.number}
                 </option>
               ))}
+              <option value="alumni">Alumni</option>
             </select>
             <Button type="submit" size="sm" variant="secondary">
               Filter
@@ -124,7 +133,9 @@ export default async function AdminExamPage({
                     </p>
                     <p className="text-dim mt-1 text-xs">{a.user.email}</p>
                   </td>
-                  <td className="px-3 py-4">{a.user.batch?.number ?? "—"}</td>
+                  <td className="px-3 py-4 whitespace-nowrap">
+                    {memberBadge(a.user) ?? "—"}
+                  </td>
                   <td className="px-3 py-4">{a.number}</td>
                   <td
                     className={`px-3 py-4 text-xs font-semibold ${a.passed ? "text-[var(--verified)]" : "text-[var(--caution)]"}`}

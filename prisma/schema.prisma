@@ -27,6 +27,11 @@ model User {
   isActive                 Boolean                   @default(true)
   /// Students always belong to a batch; administrators sit outside all batches.
   batchId                  String?
+  /// Set for a former student who signed up for certification only: the batch
+  /// they studied in before the portal existed (1-10). They sit outside the
+  /// live batches (batchId stays null) and can open only the exam, the alumni
+  /// community, and their own profile.
+  alumniBatch              Int?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   batch                    Batch?                    @relation(fields: [batchId], references: [id], onDelete: Restrict)
@@ -46,6 +51,38 @@ model User {
 
   @@index([role, isActive])
   @@index([batchId, role])
+  @@index([alumniBatch])
+}
+
+/// Emails the instructor has cleared in advance. Signing up with one creates
+/// the alumni account immediately; any other email waits as a SignupRequest.
+/// Kept in the database because this repository is public.
+model PreapprovedEmail {
+  /// Lower-cased.
+  email     String   @id
+  createdAt DateTime @default(now())
+}
+
+enum SignupRequestStatus {
+  PENDING
+  DECLINED
+}
+
+/// A certification sign-up from an email that was not pre-approved. Approving
+/// it creates the user and deletes this row; declining keeps the row so the
+/// person gets a clear answer and cannot submit again.
+model SignupRequest {
+  id           String              @id @default(cuid())
+  /// Lower-cased.
+  email        String              @unique
+  fullName     String
+  alumniBatch  Int
+  passwordHash String
+  status       SignupRequestStatus @default(PENDING)
+  createdAt    DateTime            @default(now())
+  decidedAt    DateTime?
+
+  @@index([status, createdAt])
 }
 
 /// One intake of the masterclass ("Batch 9", "Batch 11"). Each batch has its

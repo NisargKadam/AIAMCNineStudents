@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireFullAccess } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/authorization";
 import { resolveBatchFilter } from "@/lib/batches";
 import { batchLabel } from "@/lib/utils";
@@ -9,9 +9,12 @@ import { StudentDirectory } from "@/features/students/directory";
 
 export const metadata = { title: "Students" };
 
+// The directory is for the live batches. Alumni have their own community and
+// are managed from the admin console.
 const listed = {
   isActive: true,
   role: "STUDENT",
+  alumniBatch: null,
   profile: { isNot: null },
 } as const;
 
@@ -20,7 +23,7 @@ export default async function StudentsPage({
 }: {
   searchParams: Promise<{ batch?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const isAdmin = canAccessAdmin(user.role);
 
   // A student only ever sees their own batch; `?batch=` is ignored for them.

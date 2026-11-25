@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { SubmissionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireAdmin, requireUser } from "@/lib/auth/session";
+import { requireAdmin, requireFullAccess } from "@/lib/auth/session";
 import {
   assignmentSchema,
   reviewSchema,
@@ -12,7 +12,7 @@ import {
 import { audit } from "@/lib/audit";
 
 export async function submitAssignmentAction(input: unknown) {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const parsed = submissionSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
   const assignment = await db.assignment.findFirst({

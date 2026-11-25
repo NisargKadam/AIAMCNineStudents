@@ -20,7 +20,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  navSections,
+  navFor,
   sectionForPath,
   titleForPath,
   type NavItem,
@@ -34,8 +34,10 @@ export type ShellUser = {
   email: string;
   role: "ADMIN" | "STUDENT";
   avatarUrl?: string | null;
-  /** "Batch 11" for a student; administrators sit outside batches. */
+  /** "Batch 11" or "Batch 7 alumni"; administrators sit outside batches. */
   batch?: string | null;
+  /** A certification-only account, which gets the short menu. */
+  alumni?: boolean;
 };
 
 export type ShellSignal = {
@@ -136,9 +138,7 @@ export function AppShell({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const sections = navSections.filter(
-    (section) => !section.adminOnly || user.role === "ADMIN",
-  );
+  const sections = navFor({ role: user.role, alumni: user.alumni ?? false });
 
   const rail = (
     <div className="flex h-full flex-col">
@@ -445,7 +445,7 @@ export function AppShell({
       <CommandPalette
         open={palette}
         onOpenChange={setPalette}
-        isAdmin={user.role === "ADMIN"}
+        sections={sections}
         onToggleTheme={toggleTheme}
         theme={theme}
       />

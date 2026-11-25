@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth/session";
+import { isAlumni } from "@/lib/access";
 import { decryptField } from "@/lib/encryption";
 import { PageHeader } from "@/components/page-header";
 import { ProfileForm } from "@/features/profile/profile-form";
@@ -20,10 +21,16 @@ export default async function ProfilePage() {
       <PageHeader
         eyebrow="Your identity"
         title="My Profile"
-        description="Keep your cohort profile current. Optional fields stay optional, and your API key stays encrypted."
+        description={
+          isAlumni(user)
+            ? "Keep your profile current. Your photo, name, role, and country are how the alumni community knows you."
+            : "Keep your cohort profile current. Your photo, name, role, and country are required; your API key stays encrypted."
+        }
       />
       <ProfileForm
         email={user.email}
+        mustComplete={user.role !== "ADMIN"}
+        alumni={isAlumni(user)}
         apiKey={apiKey}
         profile={{
           fullName: p?.fullName ?? "",

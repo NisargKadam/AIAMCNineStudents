@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
 import { visiblePeople } from "@/lib/batches";
+import { isAlumni, memberBadge } from "@/lib/access";
 import { batchLabel } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -20,12 +21,18 @@ export default async function CommunityPage({
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
   const isAdmin = user.role === "ADMIN";
+  const alumni = isAlumni(user);
+  // Administrators and alumni read a feed that mixes batches, so each author
+  // carries a batch chip. A current student only ever sees their own batch.
+  const badgeFor = (author: Parameters<typeof memberBadge>[0]) =>
+    isAdmin || alumni ? memberBadge(author) : null;
   const view: FeedView =
     params.view === "mine" || params.view === "saved" ? params.view : "all";
   const take = 10;
 
   // Each batch has its own community: a student sees posts and comments from
-  // their batchmates and the instructors only. Administrators see every batch.
+  // their batchmates and the instructors only. Alumni of every batch share
+  // one. Administrators see everything.
   const people = visiblePeople(user);
   const where: Prisma.PostWhereInput = {
     ...(people ? { user: people } : {}),
@@ -69,10 +76,12 @@ export default async function CommunityPage({
         title="Community"
         description={
           isAdmin
-            ? "Every batch's community in one feed. Students only see posts and comments from their own batch and the instructors."
-            : user.batch
-              ? `Share what you build with ${batchLabel(user.batch.number)} and your instructors. Only your batch sees what you post here.`
-              : "Share what you build, ask sharper questions, and help the cohort move forward together."
+            ? "Every batch's community in one feed. Students only see posts and comments from their own batch and the instructors; alumni share one feed of their own."
+            : alumni
+              ? "The alumni community: everyone who came back from Batches 1 to 10, and your instructors. Share what you have built since, and help each other get certified."
+              : user.batch
+                ? `Share what you build with ${batchLabel(user.batch.number)} and your instructors. Only your batch sees what you post here.`
+                : "Share what you build, ask sharper questions, and help the cohort move forward together."
         }
       />
       <CommunityFeed
@@ -91,10 +100,7 @@ export default async function CommunityPage({
             role: post.user.role,
             avatarUrl: post.user.profile?.avatarUrl ?? null,
             githubUsername: post.user.profile?.githubUsername ?? null,
-            batch:
-              isAdmin && post.user.role === "STUDENT"
-                ? (post.user.batch?.number ?? null)
-                : null,
+            badge: badgeFor(post.user),
           },
           owned: post.userId === user.id || user.role === "ADMIN",
           authored: post.userId === user.id,
@@ -109,10 +115,7 @@ export default async function CommunityPage({
             author: {
               name: comment.user.profile?.fullName ?? comment.user.email,
               avatarUrl: comment.user.profile?.avatarUrl ?? null,
-              batch:
-                isAdmin && comment.user.role === "STUDENT"
-                  ? (comment.user.batch?.number ?? null)
-                  : null,
+              badge: badgeFor(comment.user),
             },
           })),
         }))}

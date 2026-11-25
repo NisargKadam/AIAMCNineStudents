@@ -46,9 +46,17 @@ export default async function AdminPage({
     posts,
     recent,
     confirmations,
+    waitingSignups,
+    alumni,
   ] = await Promise.all([
-    db.user.count({ where: { role: "STUDENT", ...inBatch } }),
-    db.user.count({ where: { role: "STUDENT", isActive: true, ...inBatch } }),
+    // Student figures are about the people taking the course. Alumni hold
+    // certification-only accounts and are counted on their own.
+    db.user.count({
+      where: { role: "STUDENT", alumniBatch: null, ...inBatch },
+    }),
+    db.user.count({
+      where: { role: "STUDENT", alumniBatch: null, isActive: true, ...inBatch },
+    }),
     db.prerequisite.count({
       where: { isActive: true, category: { isActive: true } },
     }),
@@ -81,6 +89,8 @@ export default async function AdminPage({
     db.prerequisiteConfirmation.count({
       where: { invalidatedAt: null, user: { role: "STUDENT", ...inBatch } },
     }),
+    db.signupRequest.count({ where: { status: "PENDING" } }),
+    db.user.count({ where: { role: "STUDENT", alumniBatch: { not: null } } }),
   ]);
 
   const countFor = (status: string) =>
@@ -100,7 +110,10 @@ export default async function AdminPage({
     {
       label: "Students",
       value: students,
-      caption: `${activeStudents} active`,
+      caption:
+        !viewing && alumni > 0
+          ? `${activeStudents} active · ${alumni} alumni`
+          : `${activeStudents} active`,
     },
     {
       label: "Readiness confirmed",
@@ -147,6 +160,25 @@ export default async function AdminPage({
           )
         }
       />
+
+      {waitingSignups > 0 && (
+        <Card
+          tone="raised"
+          className="mb-4 flex flex-wrap items-center gap-3 border-[color-mix(in_oklab,var(--caution)_35%,var(--line))] p-4"
+        >
+          <CircleAlert size={17} className="text-[var(--caution)]" />
+          <p className="text-ink text-sm font-semibold">
+            {waitingSignups} sign-up {pluralize(waitingSignups, "request")}{" "}
+            waiting for your approval
+          </p>
+          <Link
+            href="/admin/signups"
+            className="text-ember text-xs hover:underline"
+          >
+            Review {pluralize(waitingSignups, "it", "them")}
+          </Link>
+        </Card>
+      )}
 
       {batches.length > 0 && (
         <LinkTabs

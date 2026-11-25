@@ -3,26 +3,43 @@
  * so the production startup can load it without `src/`.
  */
 import type { Prisma, Role } from "@prisma/client";
+import { isAlumni } from "@/lib/access";
 
 export { findEnrollingBatch } from "../../prisma/batches";
 
 /**
  * Whose profiles, posts, and comments someone may see. A student sees only
- * their own batch and the instructors; an administrator sees everyone, which
- * is returned as undefined (no filter).
+ * their own batch and the instructors. Alumni share one community across
+ * every alumni batch, separate from the live batches. An administrator sees
+ * everyone, which is returned as undefined (no filter).
  */
 export function visiblePeople(viewer: {
   id: string;
   role: Role;
   batchId: string | null;
+  alumniBatch: number | null;
 }): Prisma.UserWhereInput | undefined {
   if (viewer.role === "ADMIN") return undefined;
+  if (isAlumni(viewer))
+    return {
+      OR: [
+        { role: "ADMIN" },
+        { id: viewer.id },
+        { role: "STUDENT", alumniBatch: { not: null } },
+      ],
+    };
   return {
     OR: [
       { role: "ADMIN" },
       { id: viewer.id },
       ...(viewer.batchId
-        ? [{ role: "STUDENT" as const, batchId: viewer.batchId }]
+        ? [
+            {
+              role: "STUDENT" as const,
+              batchId: viewer.batchId,
+              alumniBatch: null,
+            },
+          ]
         : []),
     ],
   };

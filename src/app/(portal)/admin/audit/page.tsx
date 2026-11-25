@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ScrollText } from "lucide-react";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,9 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
+  // Guarded here as well as in the layout: a layout is not re-run for every
+  // request, so it cannot be the only thing standing in front of this page.
+  await requireAdmin();
   const page = Math.max(1, Number((await searchParams).page) || 1);
   const [entries, total] = await Promise.all([
     db.auditLog.findMany({

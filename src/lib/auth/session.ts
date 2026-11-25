@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/lib/db";
 import { canAccessAdmin } from "@/lib/authorization";
+import { isAlumni } from "@/lib/access";
+import { profileGaps } from "@/lib/profile-gaps";
 import { hashSessionToken } from "@/lib/auth/crypto";
 
 const COOKIE_NAME = "aiamc_session";
@@ -60,13 +62,47 @@ export const getCurrentUser = cache(async () => {
   return session.user;
 });
 
-export async function requireUser() {
+/**
+ * Signed in, and nothing more. Only for the places someone with an unfinished
+ * profile must still reach: the shell, the welcome step, saving a profile,
+ * uploading a photo, and an exam that is already running.
+ */
+/** The signed-in person as every guard returns them. */
+export type CurrentUser = NonNullable<
+  Awaited<ReturnType<typeof getCurrentUser>>
+>;
+
+export async function requireSignedIn() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   return user;
 }
-export async function requireAdmin() {
+
+/**
+ * The guard for portal pages and actions. Everyone except an administrator
+ * must have a photo and a complete profile first; until then they are taken
+ * to the welcome step.
+ */
+export async function requireUser() {
+  const user = await requireSignedIn();
+  if (!canAccessAdmin(user.role) && profileGaps(user.profile).length > 0)
+    redirect("/welcome");
+  return user;
+}
+
+/**
+ * For everything that belongs to a live batch: sessions, materials, the
+ * readiness checklist, assignments, the directory. Alumni hold a
+ * certification-only account and are sent back to their home.
+ */
+export async function requireFullAccess() {
   const user = await requireUser();
+  if (isAlumni(user)) redirect("/dashboard");
+  return user;
+}
+
+export async function requireAdmin() {
+  const user = await requireSignedIn();
   if (!canAccessAdmin(user.role)) redirect("/unauthorized");
   return user;
 }

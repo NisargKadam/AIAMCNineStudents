@@ -25,6 +25,7 @@ import { Card } from "@/components/ui/card";
 import { Confirm } from "@/components/ui/dialog";
 import { startExamAction, saveExamAction, runExampleAction } from "./actions";
 import { CertificateCard } from "./certificate-card";
+import type { Instructor } from "./instructor";
 import {
   kindLabels,
   type ActiveExam,
@@ -42,12 +43,15 @@ export function ExamBoard({
   certificate,
   defaultName,
   baseUrl,
+  instructor,
 }: {
   active: ActiveExam | null;
   results: ExamResult[];
   certificate: CertificateView | null;
   defaultName: string;
   baseUrl: string;
+  /** Whose tag every shared certificate carries. */
+  instructor: Instructor;
 }) {
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
@@ -115,6 +119,7 @@ export function ExamBoard({
           initial={certificate}
           defaultName={defaultName}
           baseUrl={baseUrl}
+          instructor={instructor}
         />
       ) : (
         <>

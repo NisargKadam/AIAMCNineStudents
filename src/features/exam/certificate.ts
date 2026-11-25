@@ -5,7 +5,8 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
 let fonts: Promise<Buffer[]> | undefined;
-function getFonts() {
+/** Noto Sans for names, then Great Vibes for the signature. */
+export function certificateFonts() {
   return (fonts ??= Promise.all(
     ["noto-sans.ttf", "great-vibes.ttf"].map((name) =>
       readFile(path.join(process.cwd(), "public/fonts", name)),
@@ -21,7 +22,7 @@ export function verificationUrl(id: string) {
 }
 
 export async function supportsCertificateName(name: string) {
-  const [bytes] = await getFonts();
+  const [bytes] = await certificateFonts();
   const font = fontkit.create(bytes);
   return [...name].every((char) =>
     font.hasGlyphForCodePoint(char.codePointAt(0)!),
@@ -35,7 +36,7 @@ export async function createCertificatePDF(
 ) {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const [nameBytes, signatureBytes] = await getFonts();
+  const [nameBytes, signatureBytes] = await certificateFonts();
   const [sans, bold, serif, nameFont, signature] = await Promise.all([
     doc.embedFont(StandardFonts.Helvetica),
     doc.embedFont(StandardFonts.HelveticaBold),

@@ -1,10 +1,10 @@
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireFullAccess } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { AssignmentBoard } from "@/features/assignments/assignment-board";
 export const metadata = { title: "Assignments" };
 export default async function AssignmentsPage() {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const assignments = await db.assignment.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: "asc" },

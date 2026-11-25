@@ -34,6 +34,7 @@ import { Progress } from "@/components/ui/progress";
 import { Confirm, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/avatar";
+import { alumniLabel } from "@/lib/access";
 import { batchLabel, pluralize } from "@/lib/utils";
 
 export type ManagedStudent = {
@@ -47,6 +48,8 @@ export type ManagedStudent = {
   country: string | null;
   batchId: string | null;
   batchNumber: number | null;
+  /** Set for a certification-only account; such a row has no live batch. */
+  alumniBatch: number | null;
   joinedAt: string;
   resetRequestedAt: string | null;
   prereqDone: number;
@@ -164,7 +167,9 @@ export function StudentManager({
       [
         s.name,
         s.email,
-        s.batchNumber ?? "",
+        s.alumniBatch !== null
+          ? alumniLabel(s.alumniBatch)
+          : (s.batchNumber ?? ""),
         s.isActive ? "yes" : "no",
         s.githubUsername ?? "",
         s.currentRole ?? "",
@@ -413,7 +418,12 @@ export function StudentManager({
                         {student.email}
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {viewingBatch === null &&
+                        {student.alumniBatch !== null ? (
+                          <Badge tone="halo">
+                            Alumni · {batchLabel(student.alumniBatch)}
+                          </Badge>
+                        ) : (
+                          viewingBatch === null &&
                           (student.batchNumber !== null ? (
                             <Badge
                               tone={
@@ -426,7 +436,8 @@ export function StudentManager({
                             </Badge>
                           ) : (
                             <Badge tone="caution">No batch</Badge>
-                          ))}
+                          ))
+                        )}
                         {student.resetRequestedAt && (
                           <Badge tone="caution">Password reset requested</Badge>
                         )}
@@ -721,7 +732,11 @@ export function StudentManager({
               <Field
                 label="Batch"
                 htmlFor="edit-batch"
-                hint="Moving a student changes which sessions and materials they see. Their work is kept."
+                hint={
+                  editing.alumniBatch !== null
+                    ? `An alumni account from ${batchLabel(editing.alumniBatch)}: exam, community, and profile only. Choosing a batch gives them full access as a student of that batch.`
+                    : "Moving a student changes which sessions and materials they see. Their work is kept."
+                }
                 className="sm:col-span-2"
               >
                 <Select
@@ -730,7 +745,11 @@ export function StudentManager({
                   defaultValue={editing.batchId ?? ""}
                 >
                   {editing.batchId === null && (
-                    <option value="">No batch</option>
+                    <option value="">
+                      {editing.alumniBatch !== null
+                        ? "Alumni: certification only"
+                        : "No batch"}
+                    </option>
                   )}
                   {batches.map((batch) => (
                     <option key={batch.id} value={batch.id}>

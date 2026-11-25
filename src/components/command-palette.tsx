@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { CornerDownLeft, Moon, Search, Sun } from "lucide-react";
-import { navSections } from "@/components/nav-config";
+import type { NavSection } from "@/components/nav-config";
 import { cn } from "@/lib/utils";
 
 type Command = {
@@ -17,7 +17,8 @@ type Command = {
 
 type PaletteProps = {
   onOpenChange: (open: boolean) => void;
-  isAdmin: boolean;
+  /** The same menu the rail shows, so the palette never offers a locked page. */
+  sections: NavSection[];
   onToggleTheme: () => void;
   theme: "dark" | "light";
 };
@@ -28,7 +29,7 @@ type PaletteProps = {
  */
 function PaletteBody({
   onOpenChange,
-  isAdmin,
+  sections,
   onToggleTheme,
   theme,
 }: PaletteProps) {
@@ -37,18 +38,16 @@ function PaletteBody({
   const [cursor, setCursor] = useState(0);
 
   const commands = useMemo<Command[]>(() => {
-    const navigation = navSections
-      .filter((section) => !section.adminOnly || isAdmin)
-      .flatMap((section) =>
-        section.items.map((item) => ({
-          id: item.href,
-          label: item.label,
-          hint: item.hint,
-          group: section.heading,
-          icon: item.icon,
-          run: () => router.push(item.href),
-        })),
-      );
+    const navigation = sections.flatMap((section) =>
+      section.items.map((item) => ({
+        id: item.href,
+        label: item.label,
+        hint: item.hint,
+        group: section.heading,
+        icon: item.icon,
+        run: () => router.push(item.href),
+      })),
+    );
     return [
       ...navigation,
       {
@@ -61,7 +60,7 @@ function PaletteBody({
         run: onToggleTheme,
       },
     ];
-  }, [isAdmin, onToggleTheme, router, theme]);
+  }, [sections, onToggleTheme, router, theme]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();

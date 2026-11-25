@@ -2,33 +2,24 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Award, BadgeCheck, ExternalLink } from "lucide-react";
-import { db } from "@/lib/db";
-import { verificationUrl } from "@/features/exam/certificate";
+import { appUrl, verificationUrl } from "@/features/exam/certificate";
+import { findPublicCertificate } from "@/features/exam/public-certificate";
 import { CERTIFICATION_TITLE } from "@/features/exam/types";
-
-async function findCertificate(id: string) {
-  return db.examCertificate.findFirst({
-    where: {
-      id,
-      user: { isActive: true },
-      attempt: { status: "SUBMITTED", passed: true, score: { gte: 90 } },
-    },
-    select: { id: true, name: true, issuedAt: true },
-  });
-}
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const c = await findCertificate(id);
+  const c = await findPublicCertificate(id);
   if (!c)
     return {
       title: "Credential not found",
       robots: { index: false, follow: false },
     };
   return {
+    // Makes the preview image's address absolute, which link previews need.
+    metadataBase: new URL(appUrl()),
     title: `${c.name} · AI AMC Certified`,
     description: `${c.name} earned the AI Agentic MasterClass certification as an AI & LLM Expert Engineer. Certified by Nisarg Kadam.`,
     robots: { index: false, follow: false },
@@ -38,6 +29,7 @@ export async function generateMetadata({
       url: verificationUrl(c.id),
       type: "website",
     },
+    twitter: { card: "summary_large_image" },
   };
 }
 export default async function CertificatePage({
@@ -46,7 +38,7 @@ export default async function CertificatePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const c = await findCertificate(id);
+  const c = await findPublicCertificate(id);
   if (!c) notFound();
   return (
     <main

@@ -1,6 +1,7 @@
 import "server-only";
 import { Role, SubmissionStatus } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isAlumni } from "@/lib/access";
 import type { ShellSignal } from "@/components/app-shell";
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -12,11 +13,13 @@ const WEEK = 7 * 24 * 60 * 60 * 1000;
 export async function loadSignals(user: {
   id: string;
   role: Role;
+  alumniBatch: number | null;
 }): Promise<ShellSignal[]> {
   const since = new Date(Date.now() - WEEK);
 
   if (user.role === Role.ADMIN) {
-    const [awaiting, freshPosts] = await Promise.all([
+    const [waitingSignups, awaiting, freshPosts] = await Promise.all([
+      db.signupRequest.count({ where: { status: "PENDING" } }),
       db.assignmentSubmission.findMany({
         where: { status: SubmissionStatus.SUBMITTED },
         orderBy: { updatedAt: "desc" },
@@ -29,13 +32,23 @@ export async function loadSignals(user: {
       db.post.count({ where: { createdAt: { gte: since } } }),
     ]);
 
-    const signals: ShellSignal[] = awaiting.map((submission) => ({
-      id: submission.id,
-      title: `Review ${submission.user.profile?.fullName ?? submission.user.email}`,
-      detail: `${submission.assignment.title} is waiting for feedback.`,
-      href: `/admin/students/${submission.user.id}`,
-      tone: "ember" as const,
-    }));
+    const signals: ShellSignal[] = [];
+    if (waitingSignups > 0)
+      signals.push({
+        id: "signups-waiting",
+        title: `${waitingSignups} sign-up ${waitingSignups === 1 ? "request" : "requests"} waiting`,
+        detail: "Former students are waiting for you to approve their access.",
+        href: "/admin/signups",
+        tone: "caution",
+      });
+    for (const submission of awaiting)
+      signals.push({
+        id: submission.id,
+        title: `Review ${submission.user.profile?.fullName ?? submission.user.email}`,
+        detail: `${submission.assignment.title} is waiting for feedback.`,
+        href: `/admin/students/${submission.user.id}`,
+        tone: "ember",
+      });
 
     if (freshPosts > 0)
       signals.push({
@@ -48,6 +61,8 @@ export async function loadSignals(user: {
 
     return signals;
   }
+
+  if (isAlumni(user)) return alumniSignals(user.id, since);
 
   const [submissions, prereqTotal, prereqDone, confirmation, comments] =
     await Promise.all([
@@ -132,4 +147,70 @@ export async function loadSignals(user: {
     });
 
   return signals.slice(0, 6);
+}
+
+/**
+ * An alumnus has one job here, so their list follows the exam: resume it,
+ * claim the certificate, or take it. Nothing points at coursework they
+ * cannot open.
+ */
+async function alumniSignals(userId: string, since: Date) {
+  const [attempts, certificate, comments] = await Promise.all([
+    db.examAttempt.findMany({
+      where: { userId },
+      select: { status: true, passed: true, deadline: true },
+    }),
+    db.examCertificate.findUnique({
+      where: { userId },
+      select: { id: true },
+    }),
+    db.postComment.count({
+      where: {
+        createdAt: { gte: since },
+        post: { userId },
+        NOT: { userId },
+      },
+    }),
+  ]);
+
+  const signals: ShellSignal[] = [];
+  const running = attempts.some(
+    (attempt) =>
+      attempt.status === "IN_PROGRESS" && attempt.deadline > new Date(),
+  );
+  const passed = attempts.some((attempt) => attempt.passed);
+  if (running)
+    signals.push({
+      id: "exam-running",
+      title: "Your exam is in progress",
+      detail: "The timer is running. Pick up where you left off.",
+      href: "/exam",
+      tone: "ember",
+    });
+  else if (passed && !certificate)
+    signals.push({
+      id: "certificate-ready",
+      title: "Claim your certificate",
+      detail: "You passed. Put your name on it to make it official.",
+      href: "/exam",
+      tone: "verified",
+    });
+  else if (!passed)
+    signals.push({
+      id: "exam-open",
+      title: "Take the certification exam",
+      detail: "One timed exam stands between you and your certificate.",
+      href: "/exam",
+      tone: "ember",
+    });
+
+  if (comments > 0)
+    signals.push({
+      id: "comments",
+      title: `${comments} new ${comments === 1 ? "reply" : "replies"} this week`,
+      detail: "Someone responded to what you shared.",
+      href: "/community",
+      tone: "neutral",
+    });
+  return signals;
 }

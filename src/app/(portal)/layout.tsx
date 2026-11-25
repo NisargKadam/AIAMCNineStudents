@@ -1,15 +1,16 @@
-import { requireUser } from "@/lib/auth/session";
+import { requireSignedIn } from "@/lib/auth/session";
 import { loadSignals } from "@/lib/signals";
 import { AppShell } from "@/components/app-shell";
-import { batchLabel } from "@/lib/utils";
+import { isAlumni, memberBadge } from "@/lib/access";
 
 export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireUser();
-  const signals = await loadSignals({ id: user.id, role: user.role });
+  // Each page applies its own guard; the shell only needs to know who is here.
+  const user = await requireSignedIn();
+  const signals = await loadSignals(user);
   return (
     <AppShell
       user={{
@@ -17,7 +18,8 @@ export default async function PortalLayout({
         email: user.email,
         role: user.role,
         avatarUrl: user.profile?.avatarUrl,
-        batch: user.batch ? batchLabel(user.batch.number) : null,
+        batch: memberBadge(user),
+        alumni: isAlumni(user),
       }}
       signals={signals}
     >
