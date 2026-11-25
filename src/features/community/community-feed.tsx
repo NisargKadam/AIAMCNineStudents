@@ -35,7 +35,7 @@ import { Confirm } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
-import { batchLabel, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export type FeedPost = {
   id: string;
@@ -49,8 +49,8 @@ export type FeedPost = {
     role: "ADMIN" | "STUDENT";
     avatarUrl: string | null;
     githubUsername: string | null;
-    /** The author's batch, shown to administrators; null otherwise. */
-    batch: number | null;
+    /** "Batch 11" or "Batch 7 alumni" where the feed mixes batches; null otherwise. */
+    badge: string | null;
   };
   owned: boolean;
   authored: boolean;
@@ -62,7 +62,7 @@ export type FeedPost = {
     content: string;
     createdAt: string;
     owned: boolean;
-    author: { name: string; avatarUrl: string | null; batch: number | null };
+    author: { name: string; avatarUrl: string | null; badge: string | null };
   }>;
 };
 
@@ -285,8 +285,8 @@ function PostCard({ post }: { post: FeedPost }) {
               {post.author.role === "ADMIN" ? (
                 <Badge tone="ember">Instructor</Badge>
               ) : (
-                post.author.batch !== null && (
-                  <Badge tone="halo">{batchLabel(post.author.batch)}</Badge>
+                post.author.badge !== null && (
+                  <Badge tone="halo">{post.author.badge}</Badge>
                 )
               )}
             </div>
@@ -466,9 +466,9 @@ function PostCard({ post }: { post: FeedPost }) {
                     <div className="min-w-0 flex-1">
                       <p className="text-ink text-[11px] font-semibold">
                         {comment.author.name}
-                        {comment.author.batch !== null && (
+                        {comment.author.badge !== null && (
                           <span className="ml-2 font-normal text-[var(--halo)]">
-                            {batchLabel(comment.author.batch)}
+                            {comment.author.badge}
                           </span>
                         )}
                         <span className="text-faint ml-2 font-normal">

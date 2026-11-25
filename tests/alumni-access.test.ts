@@ -37,6 +37,7 @@ import {
 } from "@/features/prerequisites/actions";
 import { saveExamAction, startExamAction } from "@/features/exam/actions";
 import { startExam } from "@/features/exam/service";
+import { toggleLikeAction } from "@/features/community/actions";
 import { GET as getFile } from "@/app/api/files/[id]/route";
 import SessionsPage from "@/app/(portal)/sessions/page";
 import MaterialsPage from "@/app/(portal)/materials/page";
@@ -294,5 +295,85 @@ describe("the profile step and a running exam", () => {
     actAs("newcomer");
     await expect(ExamPage()).rejects.toThrow("REDIRECT:/welcome");
     await expect(startExamAction()).rejects.toThrow("REDIRECT:/welcome");
+  });
+});
+
+describe("the alumni community", () => {
+  type Shown = {
+    id: string;
+    author: { name: string; badge: string | null };
+  };
+  const postIds = new Map<string, string>();
+
+  /** The suite's own posts as the signed-in person's feed shows them. */
+  async function feed() {
+    const page = await CommunityPage(noParams);
+    const children = (page as { props: { children: unknown[] } }).props
+      .children as Array<{ props?: { posts?: Shown[] } }>;
+    const posts = children.find((child) => child?.props?.posts)!.props!.posts!;
+    return posts.filter((post) => [...postIds.values()].includes(post.id));
+  }
+  const authors = (posts: Shown[]) =>
+    posts.map((post) => post.author.name.replace(`${suite} `, "")).sort();
+
+  beforeAll(async () => {
+    for (const name of ["alumna7", "alumnus3", "student", "admin"]) {
+      const post = await db.post.create({
+        data: { userId: ids.get(name)!, content: `${suite} post by ${name}` },
+      });
+      postIds.set(name, post.id);
+    }
+  });
+
+  it("shows an alumnus every alumni batch and the instructors, not current students", async () => {
+    actAs("alumna7");
+    expect(authors(await feed())).toEqual(["admin", "alumna7", "alumnus3"]);
+  });
+
+  it("leaves a current student's feed to their batch and the instructors", async () => {
+    actAs("student");
+    expect(authors(await feed())).toEqual(["admin", "student"]);
+  });
+
+  it("shows an administrator everything", async () => {
+    actAs("admin");
+    expect(authors(await feed())).toEqual([
+      "admin",
+      "alumna7",
+      "alumnus3",
+      "student",
+    ]);
+  });
+
+  it("tells alumni which batch each alumni author came from", async () => {
+    actAs("alumna7");
+    const posts = await feed();
+    const badge = (name: string) =>
+      posts.find((post) => post.id === postIds.get(name))!.author.badge;
+    expect(badge("alumnus3")).toBe("Batch 3 alumni");
+    expect(badge("alumna7")).toBe("Batch 7 alumni");
+    expect(badge("admin")).toBeNull();
+  });
+
+  it("labels alumni and current students apart for an administrator", async () => {
+    actAs("admin");
+    const posts = await feed();
+    const badge = (name: string) =>
+      posts.find((post) => post.id === postIds.get(name))!.author.badge;
+    expect(badge("alumna7")).toBe("Batch 7 alumni");
+    expect(badge("student")).toBe(`Batch ${batch.number}`);
+  });
+
+  it("lets an alumnus react to another alumnus but not to a current student", async () => {
+    actAs("alumna7");
+    expect(await toggleLikeAction(postIds.get("alumnus3")!)).toEqual({
+      liked: true,
+    });
+    expect(await toggleLikeAction(postIds.get("student")!)).toEqual({
+      liked: false,
+    });
+    expect(
+      await db.postLike.count({ where: { postId: postIds.get("student")! } }),
+    ).toBe(0);
   });
 });
