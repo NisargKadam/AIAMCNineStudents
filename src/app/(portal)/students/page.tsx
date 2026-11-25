@@ -9,9 +9,12 @@ import { StudentDirectory } from "@/features/students/directory";
 
 export const metadata = { title: "Students" };
 
+// The directory is for the live batches. Alumni have their own community and
+// are managed from the admin console.
 const listed = {
   isActive: true,
   role: "STUDENT",
+  alumniBatch: null,
   profile: { isNot: null },
 } as const;
 

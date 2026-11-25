@@ -75,8 +75,11 @@ export async function createStudentAction(input: unknown) {
           "That email belongs to an administrator. Update it from My Profile.",
       };
 
-    // A returning student keeps the batch they studied with.
+    // A returning student keeps the batch they studied with. An alumnus has
+    // no live batch, so adding them here enrols them: they become a full
+    // student of the chosen batch and keep their exam history.
     const keptBatch = existing.batch ?? batch;
+    const upgraded = existing.alumniBatch !== null;
     await db.$transaction([
       db.user.update({
         where: { id: existing.id },
@@ -84,6 +87,7 @@ export async function createStudentAction(input: unknown) {
           passwordHash: await bcrypt.hash(password, 12),
           isActive: true,
           batchId: keptBatch.id,
+          alumniBatch: null,
           profile: {
             upsert: {
               create: {
@@ -106,9 +110,16 @@ export async function createStudentAction(input: unknown) {
       customPassword: Boolean(parsed.data.password),
       batch: keptBatch.number,
     });
+    if (upgraded)
+      await audit(admin.id, "alumni_upgraded", "User", existing.id, {
+        fromAlumniBatch: existing.alumniBatch,
+        to: keptBatch.number,
+      });
     refreshStudentViews(existing.id);
     return {
-      success: `${parsed.data.fullName}'s access was updated. They stay in ${batchLabel(keptBatch.number)}, and their existing submissions and progress were kept.`,
+      success: upgraded
+        ? `${parsed.data.fullName} was an alumni account and now has full access as a student in ${batchLabel(keptBatch.number)}. Their exam attempts and certificate were kept.`
+        : `${parsed.data.fullName}'s access was updated. They stay in ${batchLabel(keptBatch.number)}, and their existing submissions and progress were kept.`,
     };
   }
 
@@ -169,12 +180,14 @@ export async function updateStudentAction(input: unknown) {
       : null;
   if (batchId && batchId !== target.batchId && !nextBatch)
     return { error: "That batch no longer exists. Pick another." };
+  // Choosing a live batch for an alumnus enrols them as a full student.
+  const upgraded = Boolean(nextBatch) && target.alumniBatch !== null;
 
   await db.user.update({
     where: { id: userId },
     data: {
       email,
-      ...(nextBatch ? { batchId: nextBatch.id } : {}),
+      ...(nextBatch ? { batchId: nextBatch.id, alumniBatch: null } : {}),
       profile: {
         upsert: {
           create: {
@@ -195,18 +208,25 @@ export async function updateStudentAction(input: unknown) {
   });
   await audit(admin.id, "student_updated", "User", userId, { email });
   if (nextBatch) {
-    await audit(admin.id, "student_batch_changed", "User", userId, {
-      from: target.batch?.number ?? null,
-      to: nextBatch.number,
-    });
+    await audit(
+      admin.id,
+      upgraded ? "alumni_upgraded" : "student_batch_changed",
+      "User",
+      userId,
+      upgraded
+        ? { fromAlumniBatch: target.alumniBatch, to: nextBatch.number }
+        : { from: target.batch?.number ?? null, to: nextBatch.number },
+    );
     revalidatePath("/sessions");
     revalidatePath("/materials");
   }
   refreshStudentViews(userId);
   return {
-    success: nextBatch
-      ? `Student details saved. ${fullName} is now in ${batchLabel(nextBatch.number)}.`
-      : "Student details saved.",
+    success: !nextBatch
+      ? "Student details saved."
+      : upgraded
+        ? `Student details saved. ${fullName} was an alumni account and now has full access as a student in ${batchLabel(nextBatch.number)}.`
+        : `Student details saved. ${fullName} is now in ${batchLabel(nextBatch.number)}.`,
   };
 }
 
@@ -280,17 +300,17 @@ export async function changeStudentRoleAction(userId: string, role: Role) {
   if (role === Role.STUDENT && (await isLastActiveAdmin(userId)))
     return { error: "The last active administrator cannot be demoted." };
 
-  // Every student belongs to a batch, so a demoted administrator without one
-  // joins the enrolling batch.
+  // Every full student belongs to a batch, so a demoted administrator without
+  // one joins the enrolling batch. Someone who signed up as an alumnus goes
+  // back to their certification-only account instead.
   const target = await db.user.findUnique({
     where: { id: userId },
-    select: { batchId: true },
+    select: { batchId: true, alumniBatch: true },
   });
-  const batch =
-    role === Role.STUDENT && !target?.batchId
-      ? await findEnrollingBatch(db)
-      : null;
-  if (role === Role.STUDENT && !target?.batchId && !batch)
+  const needsBatch =
+    role === Role.STUDENT && !target?.batchId && !target?.alumniBatch;
+  const batch = needsBatch ? await findEnrollingBatch(db) : null;
+  if (needsBatch && !batch)
     return { error: "Create a batch first in Admin console → Batches." };
   await db.user.update({
     where: { id: userId },
@@ -395,16 +415,26 @@ export async function moveStudentsToBatchAction(
   const batch = await db.batch.findUnique({ where: { id: batchId } });
   if (!batch) return { error: "That batch no longer exists. Pick another." };
 
-  const students = await db.user.findMany({
+  const selected = await db.user.findMany({
     where: { id: { in: userIds }, role: Role.STUDENT },
-    select: { id: true, batch: { select: { id: true, number: true } } },
+    select: {
+      id: true,
+      alumniBatch: true,
+      batch: { select: { id: true, number: true } },
+    },
   });
+  // Moving several people at once never upgrades an alumni account; that is
+  // done one person at a time, from Edit student.
+  const alumni = selected.filter((student) => student.alumniBatch !== null);
+  const students = selected.filter((student) => student.alumniBatch === null);
   const moving = students.filter((student) => student.batch?.id !== batch.id);
   if (moving.length === 0)
     return {
       error: students.length
         ? `Everyone selected is already in ${batchLabel(batch.number)}.`
-        : "Select at least one student.",
+        : alumni.length
+          ? "Alumni hold certification-only accounts and are not moved in bulk. To give one full access, edit them and choose a batch."
+          : "Select at least one student.",
     };
 
   await db.user.updateMany({
@@ -421,6 +451,10 @@ export async function moveStudentsToBatchAction(
   revalidatePath("/sessions");
   revalidatePath("/materials");
   return {
-    success: `${moving.length} ${pluralize(moving.length, "student")} moved to ${batchLabel(batch.number)}.`,
+    success: `${moving.length} ${pluralize(moving.length, "student")} moved to ${batchLabel(batch.number)}.${
+      alumni.length
+        ? ` ${alumni.length} alumni ${pluralize(alumni.length, "account was", "accounts were")} skipped.`
+        : ""
+    }`,
   };
 }

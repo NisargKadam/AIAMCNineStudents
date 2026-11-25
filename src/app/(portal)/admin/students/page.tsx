@@ -15,44 +15,61 @@ export default async function AdminStudentsPage({
 }) {
   await requireAdmin();
   const batches = await db.batch.findMany({ orderBy: { number: "desc" } });
-  const filter = resolveBatchFilter((await searchParams).batch, batches);
+  const requested = (await searchParams).batch;
+  // Alumni hold certification-only accounts outside every live batch, so
+  // they get a tab of their own and never count as "No batch".
+  const alumniTab = requested === "alumni";
+  const filter = alumniTab
+    ? { key: "alumni", batchId: undefined }
+    : resolveBatchFilter(requested, batches);
 
-  const [users, prereqTotal, assignmentTotal, batchCounts] = await Promise.all([
-    db.user.findMany({
-      where: {
-        role: "STUDENT",
-        ...(filter.batchId !== undefined ? { batchId: filter.batchId } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      include: {
-        profile: true,
-        batch: { select: { id: true, number: true } },
-        passwordResetRequest: true,
-        prerequisites: {
-          where: {
-            completed: true,
-            prerequisite: { isActive: true, category: { isActive: true } },
+  const [users, prereqTotal, assignmentTotal, batchCounts, alumniCount] =
+    await Promise.all([
+      db.user.findMany({
+        where: {
+          role: "STUDENT",
+          ...(alumniTab
+            ? { alumniBatch: { not: null } }
+            : filter.batchId === null
+              ? { batchId: null, alumniBatch: null }
+              : filter.batchId !== undefined
+                ? { batchId: filter.batchId }
+                : {}),
+        },
+        orderBy: { createdAt: "desc" },
+        include: {
+          profile: true,
+          batch: { select: { id: true, number: true } },
+          passwordResetRequest: true,
+          prerequisites: {
+            where: {
+              completed: true,
+              prerequisite: { isActive: true, category: { isActive: true } },
+            },
+          },
+          submissions: {
+            select: {
+              status: true,
+              assignment: { select: { isActive: true } },
+            },
           },
         },
-        submissions: {
-          select: { status: true, assignment: { select: { isActive: true } } },
-        },
-      },
-    }),
-    db.prerequisite.count({
-      where: { isActive: true, category: { isActive: true } },
-    }),
-    db.assignment.count({ where: { isActive: true } }),
-    db.user.groupBy({
-      by: ["batchId"],
-      where: { role: "STUDENT" },
-      _count: { _all: true },
-    }),
-  ]);
+      }),
+      db.prerequisite.count({
+        where: { isActive: true, category: { isActive: true } },
+      }),
+      db.assignment.count({ where: { isActive: true } }),
+      db.user.groupBy({
+        by: ["batchId"],
+        where: { role: "STUDENT" },
+        _count: { _all: true },
+      }),
+      db.user.count({ where: { role: "STUDENT", alumniBatch: { not: null } } }),
+    ]);
 
   const countFor = (batchId: string | null) =>
     batchCounts.find((row) => row.batchId === batchId)?._count._all ?? 0;
-  const unassigned = countFor(null);
+  const unassigned = countFor(null) - alumniCount;
   const viewing = batches.find((batch) => batch.id === filter.batchId);
 
   return (
@@ -62,7 +79,9 @@ export default async function AdminStudentsPage({
         title={
           viewing
             ? `${batchLabel(viewing.number)} students`
-            : "Student management"
+            : alumniTab
+              ? "Alumni"
+              : "Student management"
         }
         description="Add accounts, edit details, control access, set passwords, move people between batches, and remove people who are no longer in the cohort."
       />
@@ -84,6 +103,16 @@ export default async function AdminStudentsPage({
             href: `/admin/students?batch=${batch.number}`,
             count: countFor(batch.id),
           })),
+          ...(alumniCount > 0 || alumniTab
+            ? [
+                {
+                  key: "alumni",
+                  label: "Alumni",
+                  href: "/admin/students?batch=alumni",
+                  count: alumniCount,
+                },
+              ]
+            : []),
           ...(unassigned > 0 || filter.key === "none"
             ? [
                 {
@@ -114,6 +143,7 @@ export default async function AdminStudentsPage({
           country: user.profile?.country ?? null,
           batchId: user.batch?.id ?? null,
           batchNumber: user.batch?.number ?? null,
+          alumniBatch: user.alumniBatch,
           joinedAt: user.createdAt.toISOString(),
           resetRequestedAt:
             user.passwordResetRequest?.requestedAt.toISOString() ?? null,

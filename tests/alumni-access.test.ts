@@ -46,6 +46,17 @@ import WelcomePage from "@/app/welcome/page";
 import DashboardPage from "@/app/(portal)/dashboard/page";
 import { AlumniHome } from "@/features/dashboard/alumni-home";
 import { loadSignals } from "@/lib/signals";
+import {
+  changeStudentRoleAction,
+  createStudentAction,
+  moveStudentsToBatchAction,
+  updateStudentAction,
+} from "@/features/admin/actions";
+import AdminStudentsPage from "@/app/(portal)/admin/students/page";
+import AdminStudentPage from "@/app/(portal)/admin/students/[id]/page";
+import AdminBatchesPage from "@/app/(portal)/admin/batches/page";
+import AdminPage from "@/app/(portal)/admin/page";
+import AdminExamPage from "@/app/(portal)/admin/exam/page";
 import { GET as getFile } from "@/app/api/files/[id]/route";
 import SessionsPage from "@/app/(portal)/sessions/page";
 import MaterialsPage from "@/app/(portal)/materials/page";
@@ -504,5 +515,227 @@ describe("the alumni home", () => {
     const allowed = ["/exam", "/community", "/profile", "/dashboard"];
     expect(signals.length).toBeGreaterThan(0);
     expect(signals.every((signal) => allowed.includes(signal.href))).toBe(true);
+  });
+});
+
+describe("the admin console and alumni", () => {
+  /**
+   * Every string and number a page puts on screen itself, joined up. Text is
+   * read from children; other props are followed only to reach elements a
+   * page passes into a slot, such as a header's action.
+   */
+  function textOf(node: unknown, asChild = true): string {
+    if (typeof node === "string" || typeof node === "number")
+      return asChild ? String(node) : "";
+    if (Array.isArray(node))
+      return node.map((item) => textOf(item, asChild)).join("");
+    const props = (node as { props?: Record<string, unknown> } | null)?.props;
+    if (!props) return "";
+    return Object.entries(props)
+      .map(([key, value]) => textOf(value, key === "children"))
+      .join("");
+  }
+
+  /** The value a page hands to one of its components under a prop name. */
+  function prop<T>(node: unknown, name: string): T | undefined {
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const found = prop<T>(child, name);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    }
+    const props = (node as { props?: Record<string, unknown> })?.props;
+    if (!props) return undefined;
+    if (name in props) return props[name] as T;
+    return prop<T>(props.children, name);
+  }
+
+  const userOf = (name: string) =>
+    db.user.findUniqueOrThrow({
+      where: { id: ids.get(name)! },
+      include: { examAttempts: true },
+    });
+  const listed = (page: unknown) =>
+    (prop<Array<{ id: string }>>(page, "students") ?? []).map(
+      (student) => student.id,
+    );
+
+  beforeAll(async () => {
+    await person("upgrade-add", { alumniBatch: 6 });
+    await person("upgrade-edit", { alumniBatch: 6 });
+    await person("stays", { alumniBatch: 6 });
+    await person("drifter", { batchId: null });
+    await person("demoted", { alumniBatch: 8 });
+    await startExam(ids.get("upgrade-add")!);
+  });
+
+  it("makes an alumnus a full student when the instructor adds them to a batch", async () => {
+    actAs("admin");
+    const result = await createStudentAction({
+      fullName: `${suite} upgrade-add`,
+      email: `${suite}-upgrade-add@example.test`,
+      password: "a-long-test-password-1",
+      batchId: batch.id,
+    });
+    expect(result.success).toContain("full access");
+    const user = await userOf("upgrade-add");
+    expect(user).toMatchObject({ alumniBatch: null, batchId: batch.id });
+    expect(user.examAttempts).toHaveLength(1);
+  });
+
+  it("makes an alumnus a full student when their batch is set in the edit form", async () => {
+    actAs("admin");
+    const result = await updateStudentAction({
+      userId: ids.get("upgrade-edit"),
+      fullName: `${suite} upgrade-edit`,
+      email: `${suite}-upgrade-edit@example.test`,
+      batchId: batch.id,
+    });
+    expect(result.success).toContain("full access");
+    expect(await userOf("upgrade-edit")).toMatchObject({
+      alumniBatch: null,
+      batchId: batch.id,
+    });
+  });
+
+  it("leaves an alumnus alone when only their details are edited", async () => {
+    actAs("admin");
+    const result = await updateStudentAction({
+      userId: ids.get("stays"),
+      fullName: `${suite} stays renamed`,
+      email: `${suite}-stays@example.test`,
+    });
+    expect(result).toHaveProperty("success");
+    expect(await userOf("stays")).toMatchObject({
+      alumniBatch: 6,
+      batchId: null,
+    });
+  });
+
+  it("skips alumni when moving several people into a batch", async () => {
+    actAs("admin");
+    const result = await moveStudentsToBatchAction(
+      [ids.get("stays")!, ids.get("drifter")!],
+      batch.id,
+    );
+    expect(result.success).toContain("1 alumni account was skipped");
+    expect(await userOf("drifter")).toMatchObject({ batchId: batch.id });
+    expect(await userOf("stays")).toMatchObject({
+      alumniBatch: 6,
+      batchId: null,
+    });
+  });
+
+  it("refuses a move that selects only alumni", async () => {
+    actAs("admin");
+    const result = await moveStudentsToBatchAction(
+      [ids.get("stays")!],
+      batch.id,
+    );
+    expect(result).toHaveProperty("error");
+    expect(await userOf("stays")).toMatchObject({ batchId: null });
+  });
+
+  it("returns a demoted administrator to being an alumnus, not into a live batch", async () => {
+    actAs("admin");
+    await changeStudentRoleAction(ids.get("demoted")!, Role.ADMIN);
+    await changeStudentRoleAction(ids.get("demoted")!, Role.STUDENT);
+    expect(await userOf("demoted")).toMatchObject({
+      role: "STUDENT",
+      alumniBatch: 8,
+      batchId: null,
+    });
+  });
+
+  it("lists alumni under their own tab on Manage students", async () => {
+    actAs("admin");
+    const alumniTab = listed(
+      await AdminStudentsPage({
+        searchParams: Promise.resolve({ batch: "alumni" }),
+      }),
+    );
+    expect(alumniTab).toContain(ids.get("alumna7"));
+    expect(alumniTab).toContain(ids.get("stays"));
+    expect(alumniTab).not.toContain(ids.get("student"));
+
+    const noBatchTab = listed(
+      await AdminStudentsPage({
+        searchParams: Promise.resolve({ batch: "none" }),
+      }),
+    );
+    expect(noBatchTab).not.toContain(ids.get("alumna7"));
+  });
+
+  it("tells Manage students which rows are alumni", async () => {
+    actAs("admin");
+    const page = await AdminStudentsPage({
+      searchParams: Promise.resolve({ batch: "alumni" }),
+    });
+    const rows =
+      prop<Array<{ id: string; alumniBatch: number | null }>>(
+        page,
+        "students",
+      ) ?? [];
+    expect(rows.find((row) => row.id === ids.get("alumna7"))?.alumniBatch).toBe(
+      7,
+    );
+  });
+
+  it("does not report alumni as students missing a batch", async () => {
+    await person("unassigned", { batchId: null });
+    const unassigned = await db.user.count({
+      where: { role: "STUDENT", batchId: null, alumniBatch: null },
+    });
+    actAs("admin");
+    const text = textOf(await AdminBatchesPage());
+    expect(text).toContain(`${unassigned} student`);
+    expect(text).toContain("not in any batch");
+  });
+
+  it("counts current students on the overview and alumni beside them", async () => {
+    const [current, alumni] = await Promise.all([
+      db.user.count({ where: { role: "STUDENT", alumniBatch: null } }),
+      db.user.count({
+        where: { role: "STUDENT", alumniBatch: { not: null } },
+      }),
+    ]);
+    actAs("admin");
+    const text = textOf(await AdminPage({ searchParams: Promise.resolve({}) }));
+    expect(text).toContain(`${alumni} alumni`);
+    expect(text).toContain(`of ${current} student`);
+  });
+
+  it("shows the alumni badge on a student record instead of a missing-batch warning", async () => {
+    actAs("admin");
+    const text = textOf(
+      await AdminStudentPage({
+        params: Promise.resolve({ id: ids.get("alumna7")! }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    expect(text).toContain("Batch 7 alumni");
+    expect(text).not.toContain("No batch");
+  });
+
+  it("lets the exam console filter to alumni and names their batch", async () => {
+    actAs("admin");
+    const text = textOf(
+      await AdminExamPage({
+        searchParams: Promise.resolve({ batch: "alumni" }),
+      }),
+    );
+    expect(text).toContain(`${suite} alumna7`);
+    expect(text).toContain("Batch 7 alumni");
+    expect(text).not.toContain(`${suite} midexam`);
+  });
+
+  it("keeps alumni out of the cohort directory", async () => {
+    actAs("admin");
+    const directory = listed(
+      await StudentsPage({ searchParams: Promise.resolve({}) }),
+    );
+    expect(directory).toContain(ids.get("student"));
+    expect(directory).not.toContain(ids.get("alumna7"));
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/session";
+import { alumniLabel } from "@/lib/access";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -202,7 +203,11 @@ export default async function StudentRecordPage({
             <Badge tone={user.role === "ADMIN" ? "ember" : "neutral"}>
               {user.role === "ADMIN" ? "Administrator" : "Student"}
             </Badge>
-            {user.batch ? (
+            {user.alumniBatch !== null ? (
+              <Link href="/admin/students?batch=alumni">
+                <Badge tone="halo">{alumniLabel(user.alumniBatch)}</Badge>
+              </Link>
+            ) : user.batch ? (
               <Link href={`/admin/students?batch=${user.batch.number}`}>
                 <Badge tone="halo">{batchLabel(user.batch.number)}</Badge>
               </Link>
