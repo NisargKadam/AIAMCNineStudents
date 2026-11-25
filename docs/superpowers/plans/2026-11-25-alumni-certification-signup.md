@@ -86,17 +86,37 @@ model SignupRequest {
 ```ts
 // src/lib/access.ts
 export const ALUMNI_BATCHES: readonly number[]; // 1..10
-export function isAlumni(user: { role: Role; alumniBatch: number | null }): boolean;
+export function isAlumni(user: {
+  role: Role;
+  alumniBatch: number | null;
+}): boolean;
 export function alumniLabel(batch: number): string; // "Batch 7 alumni"
 /** "Batch 7 alumni", "Batch 11", or null for administrators and unassigned students. */
-export function memberBadge(user: { role: Role; alumniBatch: number | null; batch?: { number: number } | null }): string | null;
+export function memberBadge(user: {
+  role: Role;
+  alumniBatch: number | null;
+  batch?: { number: number } | null;
+}): string | null;
 
 // src/lib/profile-gaps.ts
 export type ProfileGap = "photo" | "fullName" | "currentRole" | "country";
-export function profileGaps(profile: { avatarUrl?: string | null; fullName?: string | null; currentRole?: string | null; country?: string | null } | null | undefined): ProfileGap[];
+export function profileGaps(
+  profile:
+    | {
+        avatarUrl?: string | null;
+        fullName?: string | null;
+        currentRole?: string | null;
+        country?: string | null;
+      }
+    | null
+    | undefined,
+): ProfileGap[];
 
 // src/features/signup/emails.ts
-export function parseEmails(text: string): { emails: string[]; invalid: string[] };
+export function parseEmails(text: string): {
+  emails: string[];
+  invalid: string[];
+};
 ```
 
 - [ ] **Step 1: Failing tests in `tests/access.test.ts`**
@@ -161,13 +181,30 @@ export const newPassword: z.ZodType<string>; // 12+, letter and number; reused b
 export const signupSchema; // { alumniBatch: int 1..10 (coerced), fullName 2..100, email lower-cased, password: newPassword }
 
 // signup/service.ts (server-only)
-export async function createAlumniUser(tx: Prisma.TransactionClient, input: { email: string; fullName: string; alumniBatch: number; passwordHash: string }): Promise<{ id: string }>;
+export async function createAlumniUser(
+  tx: Prisma.TransactionClient,
+  input: {
+    email: string;
+    fullName: string;
+    alumniBatch: number;
+    passwordHash: string;
+  },
+): Promise<{ id: string }>;
 /** Creates the user from a request and deletes the request. Returns "exists" when the email already has an account (the request is deleted). */
-export async function approveRequest(tx: Prisma.TransactionClient, requestId: string): Promise<{ userId: string; email: string } | "exists" | "missing">;
+export async function approveRequest(
+  tx: Prisma.TransactionClient,
+  requestId: string,
+): Promise<{ userId: string; email: string } | "exists" | "missing">;
 
 // signup/actions.ts
-export type SignupState = null | { error: string; code?: "exists" | "waiting" | "declined" } | { pending: { email: string; fullName: string } };
-export async function signupAction(_: SignupState, formData: FormData): Promise<SignupState>; // redirects to /welcome on instant approval
+export type SignupState =
+  | null
+  | { error: string; code?: "exists" | "waiting" | "declined" }
+  | { pending: { email: string; fullName: string } };
+export async function signupAction(
+  _: SignupState,
+  formData: FormData,
+): Promise<SignupState>; // redirects to /welcome on instant approval
 ```
 
 - [ ] **Step 1: Failing tests** (mock `next/headers` for `headers()`/`cookies()`, `next/navigation` redirect as in Task 2).
@@ -196,8 +233,12 @@ type Result = { success: string } | { error: string };
 export async function approveSignupAction(id: string): Promise<Result>;
 export async function declineSignupAction(id: string): Promise<Result>;
 export async function deleteSignupRequestAction(id: string): Promise<Result>;
-export async function addPreapprovedEmailsAction(text: string): Promise<Result & { invalid?: string[] }>;
-export async function removePreapprovedEmailAction(email: string): Promise<Result>;
+export async function addPreapprovedEmailsAction(
+  text: string,
+): Promise<Result & { invalid?: string[] }>;
+export async function removePreapprovedEmailAction(
+  email: string,
+): Promise<Result>;
 ```
 
 - [ ] **Step 1: Failing tests.** Approve creates the user with the request's hash (the chosen password verifies), deletes the request, audits `signup_approved`. Approve when a user with that email now exists → error, request deleted, user untouched. Decline → `DECLINED` + `decidedAt`; approving a declined request works. `addPreapprovedEmailsAction` with a messy list adds each once, reports already-present and invalid entries, approves a waiting request for a listed email, leaves a declined one declined and names it in the message. Non-admin calling any action is redirected. Admin `loadSignals` includes a signal linking to `/admin/signups` while a request is waiting.
@@ -214,11 +255,26 @@ export async function removePreapprovedEmailAction(email: string): Promise<Resul
 
 ```ts
 export const studentProfileSchema; // profileSchema with avatarUrl, fullName, currentRole, country required
-export const welcomeSchema;        // studentProfileSchema without the API-key fields
-export async function completeProfileAction(_: unknown, formData: FormData): Promise<{ error: string } | never>; // redirect("/dashboard")
+export const welcomeSchema; // studentProfileSchema without the API-key fields
+export async function completeProfileAction(
+  _: unknown,
+  formData: FormData,
+): Promise<{ error: string } | never>; // redirect("/dashboard")
 export async function prepareAvatar(file: File): Promise<File>; // 512×512 centre-cropped JPEG; throws Error with a readable message
-export function PhotoPicker(props: { name: string; email: string; value: string; onChange(url: string): void; allowRemove?: boolean }): JSX.Element;
-export function MemberCard(props: { name: string; role: string; country: string; avatarUrl: string; badge: string | null }): JSX.Element;
+export function PhotoPicker(props: {
+  name: string;
+  email: string;
+  value: string;
+  onChange(url: string): void;
+  allowRemove?: boolean;
+}): JSX.Element;
+export function MemberCard(props: {
+  name: string;
+  role: string;
+  country: string;
+  avatarUrl: string;
+  badge: string | null;
+}): JSX.Element;
 ```
 
 - [ ] **Step 1: Failing tests.** `welcomeSchema` rejects a missing photo with "Add a profile photo", missing role, missing country; accepts `/api/files/abc123`. `completeProfileAction` as the incomplete student saves and rejects `REDIRECT:/dashboard`, after which `requireUser()` resolves. `updateProfileAction` as a student with `avatarUrl: ""` returns an error and keeps the old photo; as an admin it still saves.
@@ -262,12 +318,21 @@ export function MemberCard(props: { name: string; role: string; country: string;
 **Interfaces — Produces:**
 
 ```ts
-export const INSTRUCTOR: { name: string; linkedinUrl: string; instagramHandle: string }; // handle without "@"; "" hides Instagram
-export function linkedinPost(url: string): string;      // contains INSTRUCTOR.name, INSTRUCTOR.linkedinUrl and url
+export const INSTRUCTOR: {
+  name: string;
+  linkedinUrl: string;
+  instagramHandle: string;
+}; // handle without "@"; "" hides Instagram
+export function linkedinPost(url: string): string; // contains INSTRUCTOR.name, INSTRUCTOR.linkedinUrl and url
 export function linkedinComposeUrl(url: string): string; // https://www.linkedin.com/feed/?shareActive=true&text=…
 export function instagramCaption(url: string): string | null; // contains "@" + handle and url; null when no handle
-export async function findPublicCertificate(id: string): Promise<{ id: string; name: string; issuedAt: Date } | null>;
-export async function certificateShareImage(certificate: { id: string; name: string; issuedAt: Date }, shape: "wide" | "square"): Promise<ImageResponse>; // 1200×630, 1080×1080
+export async function findPublicCertificate(
+  id: string,
+): Promise<{ id: string; name: string; issuedAt: Date } | null>;
+export async function certificateShareImage(
+  certificate: { id: string; name: string; issuedAt: Date },
+  shape: "wide" | "square",
+): Promise<ImageResponse>; // 1200×630, 1080×1080
 ```
 
 - [ ] **Step 1: Failing tests.** `linkedinPost(url)` includes the instructor's name, LinkedIn URL and `url`; `linkedinComposeUrl` round-trips that text through `URLSearchParams`; `instagramCaption` includes `@handle` when set and is null when the handle is empty.

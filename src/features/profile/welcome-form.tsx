@@ -289,7 +289,14 @@ export function WelcomeForm({
               </p>
             )}
 
-            <Button className="w-full" size="lg" disabled={pending}>
+            {/* The click comes before the browser checks the fields, so a
+                missing photo is pointed out together with any empty field. */}
+            <Button
+              className="w-full"
+              size="lg"
+              disabled={pending}
+              onClick={() => setPhotoMissing(!avatar)}
+            >
               {pending ? (
                 <LoaderCircle className="animate-spin" size={17} />
               ) : (

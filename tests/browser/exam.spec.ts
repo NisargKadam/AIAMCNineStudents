@@ -8,6 +8,13 @@ const suite = `exam-ui-${Date.now()}`;
 let studentId = "",
   adminId = "",
   mobileId = "";
+// Every student has a photo and a complete profile before they can start an
+// exam, so the fixtures arrive with one.
+const completeProfile = {
+  avatarUrl: "https://example.test/avatar.png",
+  currentRole: "AI Engineer",
+  country: "Singapore",
+};
 async function authenticate(context: BrowserContext, userId: string) {
   const token = randomBytes(32).toString("base64url");
   await db.session.create({
@@ -30,7 +37,9 @@ test.beforeAll(async () => {
         role,
         passwordHash: "unused",
         batchId: role === "STUDENT" ? batch.id : null,
-        profile: { create: { fullName: "Jordan AI Engineer" } },
+        profile: {
+          create: { fullName: "Jordan AI Engineer", ...completeProfile },
+        },
       },
     });
     if (role === "STUDENT") studentId = user.id;
@@ -42,7 +51,9 @@ test.beforeAll(async () => {
         email: `${suite}-mobile@example.test`,
         passwordHash: "unused",
         batchId: batch.id,
-        profile: { create: { fullName: "Mobile Exam Student" } },
+        profile: {
+          create: { fullName: "Mobile Exam Student", ...completeProfile },
+        },
       },
     })
   ).id;
@@ -179,6 +190,24 @@ test("student exam, autosave, Python, failure, retry, expiry, certificate, and a
       .getAttribute("href")) ?? "",
   );
   expect(linkedin.searchParams.get("certId")).toBe(certificate.id);
+  // Sharing: the post is written already and credits the instructor.
+  const compose = new URL(
+    (await page
+      .getByRole("link", { name: "Share on LinkedIn" })
+      .getAttribute("href")) ?? "",
+  );
+  expect(compose.origin + compose.pathname).toBe(
+    "https://www.linkedin.com/feed/",
+  );
+  const post = compose.searchParams.get("text") ?? "";
+  expect(post).toContain(`/certificates/${certificate.id}`);
+  expect(post).toContain("Nisarg Kadam");
+  expect(post).toContain("linkedin.com/in/");
+  await expect(
+    page.getByRole("button", { name: "Share on Instagram" }),
+  ).toBeVisible();
+  await page.getByText("See what will be posted").click();
+  await expect(page.getByText("@e2e.instructor").first()).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download PDF" }).click();
   await mkdir("/tmp/aiamc-exam-qa", { recursive: true });
@@ -194,6 +223,18 @@ test("student exam, autosave, Python, failure, retry, expiry, certificate, and a
   await expect(
     verify.getByText("Verified credential", { exact: true }),
   ).toBeVisible();
+  // The link preview and the share image are pictures anyone can load.
+  expect(
+    await verify.locator('meta[property="og:image"]').getAttribute("content"),
+  ).toContain(`/certificates/${certificate.id}/opengraph-image`);
+  for (const path of [
+    `/certificates/${certificate.id}/opengraph-image`,
+    `/api/exam/certificate/${certificate.id}/image?shape=square`,
+  ]) {
+    const image = await anonymous.request.get(`http://localhost:3001${path}`);
+    expect(image.status()).toBe(200);
+    expect(image.headers()["content-type"]).toBe("image/png");
+  }
   expect(
     (
       await anonymous.request.get(

@@ -79,6 +79,8 @@ Copy `.env.example`; never commit `.env`.
 | `EXAM_BANK_BASE64`               | Private server-only assessment definition; never commit the real bank |
 | `CLOUDINARY_*`                   | Optional; sends images to Cloudinary instead of PostgreSQL            |
 | `SEED_DEMO_DATA`                 | Creates a demo student only when exactly `true`                       |
+| `INSTRUCTOR_INSTAGRAM_HANDLE`    | Optional; the handle tagged when a certificate is shared to Instagram |
+| `INSTRUCTOR_LINKEDIN_URL`        | Optional; overrides the instructor profile credited in LinkedIn posts |
 
 Generate secrets:
 
@@ -177,9 +179,48 @@ posts show only their batchmates and the instructors. They also see only their
 own batch's sessions and materials, and their batch in the sidebar and on the
 dashboard. Administrators see every batch, with batch labels and filters.
 
+## Alumni sign-up and certification
+
+Students of the batches that ran before the portal (**Batches 1 to 10**) sign
+themselves up at `/signup` with their batch, name, email, and a password they
+choose. They get a **certification-only** account: an alumni home, the exam,
+the alumni community, and their own profile. Sessions, materials, the
+readiness checklist, assignments, the directory, and About stay closed to
+them, in the menu and on the server.
+
+- **Pre-approved emails get in at once.** Paste the list into **Admin Console →
+  Sign-up requests → Pre-approved emails**. Commas, spaces, new lines, capitals,
+  and duplicates are all handled, and the tab shows who has joined. The list
+  lives in the database only: this repository is public, so never commit
+  student emails.
+- **Any other email waits for approval** under **Waiting**, where an
+  administrator approves or declines it. Waiting requests also appear in the
+  bell menu and on the admin overview. A declined person is told so when they
+  sign in and stays declined until approved from **Declined**.
+- The portal sends no email. An approved person finds out by signing in with
+  the password they chose, and a pre-approved email is not proof of ownership,
+  so deactivate an account that turns out to be someone else's.
+- All alumni share **one community**, separate from the live batches' feeds.
+  Instructors' posts reach both.
+- Adding an alumnus through **Add student**, or picking a batch for them in
+  **Edit student**, makes them a full student of that batch and keeps their exam
+  history. Bulk **Move to batch** skips alumni.
+
+Every student, alumni or current, must add a **photo, full name, current role,
+and country** before using the portal; until then they land on `/welcome`.
+Photos are cropped square and shrunk in the browser before upload.
+Administrators are exempt, and a running exam is never interrupted.
+
+A certified student can **share the certificate** from the Exam page. LinkedIn
+opens with a written post that credits the instructor, Instagram gets a square
+image and a caption that tags the instructor, and the image itself carries the
+instructor's name and handles. Set `INSTRUCTOR_INSTAGRAM_HANDLE` to turn on
+Instagram sharing; without it the Instagram button is hidden so nothing is
+shared untagged.
+
 ## Admin setup and student authentication
 
-Set `ADMIN_EMAIL` and a unique 12+ character `ADMIN_PASSWORD`, then run `npm run db:seed`. Public registration does not exist. An administrator creates a student with full name and email from **Admin Console → Students**. The account receives the bcrypt-hashed `DEFAULT_STUDENT_PASSWORD`; the UI never exposes hashes or saved secrets.
+Set `ADMIN_EMAIL` and a unique 12+ character `ADMIN_PASSWORD`, then run `npm run db:seed`. Besides the alumni sign-up above, public registration does not exist. An administrator creates a student with full name and email from **Admin Console → Students**. The account receives the bcrypt-hashed `DEFAULT_STUDENT_PASSWORD`; the UI never exposes hashes or saved secrets.
 
 Administrators can edit details, set an explicit password, reset to the cohort default, activate/deactivate accounts, promote/demote roles, delete accounts, and apply the same operations to a multi-row selection. The final active administrator cannot be demoted, deactivated, or deleted, and administrators cannot deactivate, demote, or delete themselves. Deleting an account removes its profile, checklist progress, submissions, posts, and comments, and the deletion itself is written to the audit log first so the record survives.
 

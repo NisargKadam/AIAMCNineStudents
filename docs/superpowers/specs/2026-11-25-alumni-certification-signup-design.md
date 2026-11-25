@@ -79,33 +79,33 @@ initials.
 
 **How an alumni account is represented**
 
-1. *Real `Batch` rows for 1–10 plus an access flag.* Batch badges and filters
+1. _Real `Batch` rows for 1–10 plus an access flag._ Batch badges and filters
    work for free, but nine empty batches appear in every admin batch picker
    (students, sessions, materials, exam), the startup seed would add session
    slots to each of them, and Batch 9 would mix current students with alumni
    in the same directory and feed unless every query is patched.
-2. *A plain number on the user: `alumniBatch` (1–10), with no live batch.*
+2. _A plain number on the user: `alumniBatch` (1–10), with no live batch._
    **Chosen.** For alumni the batch is a label, not a schedule. The `Batch`
    table keeps meaning "an intake this portal runs". One rule covers access:
    `alumniBatch` is set ⇒ certification-only.
-3. *A new `ALUMNI` role.* Rejected: about twenty places check
+3. _A new `ALUMNI` role._ Rejected: about twenty places check
    `role === "STUDENT"` (exam, certificates, community, admin lists), and all
    of them would need to learn the new role.
 
 **Where the pre-approved emails live**
 
-1. *In the code or a migration.* Rejected: the repo is public.
-2. *An environment variable on Railway.* Works, but every change is a
+1. _In the code or a migration._ Rejected: the repo is public.
+2. _An environment variable on Railway._ Works, but every change is a
    redeploy and the instructor cannot see who has joined.
-3. *A database table managed from the admin screen.* **Chosen.** The
+3. _A database table managed from the admin screen._ **Chosen.** The
    instructor pastes the list once, can add or remove people later, and sees
    who has signed up. Nothing personal goes into git.
 
 **Where pending sign-ups live**
 
-1. *Inactive `User` rows.* Rejected: half-created users would leak into
+1. _Inactive `User` rows._ Rejected: half-created users would leak into
    student counts, lists and exports.
-2. *A separate `SignupRequest` table; the user is created on approval.*
+2. _A separate `SignupRequest` table; the user is created on approval._
    **Chosen.**
 
 ## Design
@@ -118,7 +118,7 @@ One migration.
   in (1–10). Set only by sign-up/approval. Alumni always have `batchId` null.
 - `PreapprovedEmail { email (id, lower-cased), createdAt }`.
 - `SignupRequest { id, email (unique, lower-cased), fullName, alumniBatch,
-  passwordHash, status PENDING | DECLINED, createdAt, decidedAt }`.
+passwordHash, status PENDING | DECLINED, createdAt, decidedAt }`.
   Approving creates the user and deletes the request (the audit log keeps the
   history). Declining keeps the row so the person gets a clear answer and
   cannot re-submit; the instructor can still approve or delete it later.
@@ -188,14 +188,14 @@ approve, decline, list change and sign-up is written to the audit log.
 
 ### What alumni can open
 
-| Area | Alumni |
-| --- | --- |
-| Home (`/dashboard`) | An alumni version: certification status, latest community posts, their card |
-| Exam, certificate | Yes, unchanged rules |
-| Community | Yes — the alumni community (below) |
-| My profile | Yes |
+| Area                                                             | Alumni                                                                                             |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Home (`/dashboard`)                                              | An alumni version: certification status, latest community posts, their card                        |
+| Exam, certificate                                                | Yes, unchanged rules                                                                               |
+| Community                                                        | Yes — the alumni community (below)                                                                 |
+| My profile                                                       | Yes                                                                                                |
 | Sessions, Materials, Prerequisites, Assignments, Students, About | No — hidden from the menu and the ⌘K palette; the URL sends them home; the matching actions refuse |
-| Session materials download | No (already tied to a live batch) |
+| Session materials download                                       | No (already tied to a live batch)                                                                  |
 
 Enforcement is a second guard next to `requireUser()`, used by every
 full-student page and action. The menu and palette are filtered from the same
@@ -336,8 +336,8 @@ These were not specified; each is a call that can be reversed.
 9. A declined request stays declined even if that email is later pasted into
    the pre-approved list; the instructor approves it from the Declined tab.
 10. Sign-up tells a person when their email already has an account. That
-   reveals an account exists, which the sign-in page avoids; here the clearer
-   message was judged worth it for a small invited group.
+    reveals an account exists, which the sign-in page avoids; here the clearer
+    message was judged worth it for a small invited group.
 
 ## Left to the builder
 
