@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth/session";
+import { requireSignedIn } from "@/lib/auth/session";
 import { uploadCommunityImage } from "@/lib/storage";
 
 export async function POST(request: Request) {
-  const user = await requireUser();
+  const user = await requireSignedIn();
   try {
     const formData = await request.formData();
     const file = formData.get("file");

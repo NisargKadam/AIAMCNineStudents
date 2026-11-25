@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireAdmin, requireUser } from "@/lib/auth/session";
+import { requireAdmin, requireFullAccess } from "@/lib/auth/session";
 import { categorySchema, prerequisiteSchema } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 
 export async function savePrerequisiteChecklist(
   items: Array<{ id: string; completed: boolean }>,
 ) {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const active = await db.prerequisite.findMany({
     where: { isActive: true, category: { isActive: true } },
     select: { id: true },
@@ -45,7 +45,7 @@ export async function savePrerequisiteChecklist(
 }
 
 export async function confirmPrerequisites() {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const [config, total, completed] = await Promise.all([
     db.prerequisiteConfig.findUnique({ where: { id: 1 } }),
     db.prerequisite.count({

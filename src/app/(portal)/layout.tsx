@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/session";
+import { requireSignedIn } from "@/lib/auth/session";
 import { loadSignals } from "@/lib/signals";
 import { AppShell } from "@/components/app-shell";
 import { batchLabel } from "@/lib/utils";
@@ -8,7 +8,8 @@ export default async function PortalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireUser();
+  // Each page applies its own guard; the shell only needs to know who is here.
+  const user = await requireSignedIn();
   const signals = await loadSignals({ id: user.id, role: user.role });
   return (
     <AppShell

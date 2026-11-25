@@ -30,11 +30,18 @@ import AdminStudentsPage from "@/app/(portal)/admin/students/page";
 import StudentsPage from "@/app/(portal)/students/page";
 import CommunityPage from "@/app/(portal)/community/page";
 
-vi.mock("@/lib/auth/session", () => ({
-  requireAdmin: vi.fn(),
-  requireUser: vi.fn(),
-  getCurrentUser: vi.fn(),
-}));
+// One stand-in answers for every signed-in guard, so a test names the viewer
+// once whichever guard the page or action under test happens to use.
+vi.mock("@/lib/auth/session", () => {
+  const requireUser = vi.fn();
+  return {
+    requireAdmin: vi.fn(),
+    requireUser,
+    requireSignedIn: requireUser,
+    requireFullAccess: requireUser,
+    getCurrentUser: vi.fn(),
+  };
+});
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/features/admin/student-manager", () => ({
   StudentManager: ({ students }: { students: unknown }) =>

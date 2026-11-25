@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth/session", () => ({
-  requireUser: vi.fn(),
-  getCurrentUser: vi.fn(),
-}));
+vi.mock("@/lib/auth/session", () => {
+  const requireUser = vi.fn();
+  return { requireUser, requireSignedIn: requireUser, getCurrentUser: vi.fn() };
+});
 import { db } from "@/lib/db";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { startExam, mutateExam, loadExam } from "@/features/exam/service";

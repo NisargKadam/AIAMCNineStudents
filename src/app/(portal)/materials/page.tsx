@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireFullAccess } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/authorization";
 import { chooseBatch } from "@/lib/batches";
 import { batchLabel } from "@/lib/utils";
@@ -14,7 +14,7 @@ export default async function MaterialsPage({
 }: {
   searchParams: Promise<{ batch?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const canEdit = canAccessAdmin(user.role);
 
   // Materials hang off sessions, so they follow the same batch as the schedule.

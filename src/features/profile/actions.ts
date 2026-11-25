@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import {
-  requireUser,
+  requireSignedIn,
   revokeOtherSessions,
   verifyPassword,
 } from "@/lib/auth/session";
@@ -13,7 +13,7 @@ import { passwordChangeSchema, profileSchema } from "@/lib/validation";
 import { audit } from "@/lib/audit";
 
 export async function updateProfileAction(_: unknown, formData: FormData) {
-  const user = await requireUser();
+  const user = await requireSignedIn();
   const parsed = profileSchema.safeParse({
     fullName: formData.get("fullName"),
     githubUsername: formData.get("githubUsername"),
@@ -71,7 +71,7 @@ export async function updateProfileAction(_: unknown, formData: FormData) {
 }
 
 export async function changeOwnPasswordAction(_: unknown, formData: FormData) {
-  const user = await requireUser();
+  const user = await requireSignedIn();
   const parsed = passwordChangeSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),

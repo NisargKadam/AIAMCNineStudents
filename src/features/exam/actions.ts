@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth/session";
+import { requireSignedIn, requireUser } from "@/lib/auth/session";
 import { startExam, mutateExam, withExamLock, ExamError } from "./service";
 import { bankForVersion } from "./bank";
 import { checkPython } from "./python";
@@ -34,7 +34,9 @@ export async function saveExamAction(
   answers: unknown,
   submit = false,
 ): Promise<{ error?: string; result?: ExamResult | null; serverNow?: string }> {
-  const user = await requireUser();
+  // Saving and running code only ever act on an attempt that is already
+  // running, so they skip the profile step rather than interrupt the exam.
+  const user = await requireSignedIn();
   if (
     user.role !== "STUDENT" ||
     typeof id !== "string" ||
@@ -59,7 +61,7 @@ export async function runExampleAction(
   questionId: string,
   code: string,
 ): Promise<{ error?: string; passed?: boolean }> {
-  const user = await requireUser();
+  const user = await requireSignedIn();
   if (
     user.role !== "STUDENT" ||
     typeof attemptId !== "string" ||

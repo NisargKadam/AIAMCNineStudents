@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireFullAccess } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/authorization";
 import { chooseBatch } from "@/lib/batches";
 import { batchLabel } from "@/lib/utils";
@@ -15,7 +15,7 @@ export default async function SessionsPage({
 }: {
   searchParams: Promise<{ batch?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const canEdit = canAccessAdmin(user.role);
 
   // Each batch has its own schedule. Students see their batch's; an

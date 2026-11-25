@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireFullAccess } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/authorization";
 import { resolveBatchFilter } from "@/lib/batches";
 import { batchLabel } from "@/lib/utils";
@@ -20,7 +20,7 @@ export default async function StudentsPage({
 }: {
   searchParams: Promise<{ batch?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireFullAccess();
   const isAdmin = canAccessAdmin(user.role);
 
   // A student only ever sees their own batch; `?batch=` is ignored for them.

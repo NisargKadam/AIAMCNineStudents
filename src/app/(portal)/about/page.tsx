@@ -1,4 +1,5 @@
 import { BrainCircuit, Code2, HeartHandshake, Layers3 } from "lucide-react";
+import { requireFullAccess } from "@/lib/auth/session";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 
@@ -27,7 +28,8 @@ const principles = [
   },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  await requireFullAccess();
   return (
     <>
       <PageHeader
