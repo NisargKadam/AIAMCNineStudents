@@ -88,6 +88,23 @@ export const profileSchema = z.object({
   openAiApiKey: z.string().trim().max(300).optional(),
   removeApiKey: z.boolean().optional(),
 });
+/**
+ * What every student must have before using the portal: a photo, their name,
+ * what they do, and where they are. Administrators keep the optional schema.
+ */
+export const studentProfileSchema = profileSchema.extend({
+  fullName: z.string().trim().min(2, "Enter your full name").max(100),
+  currentRole: z.string().trim().min(2, "Add your current role").max(100),
+  country: z.string().trim().min(2, "Add your country").max(80),
+  avatarUrl: z.union([webUrl, storedFilePath], {
+    error: "Add a profile photo",
+  }),
+});
+/** The welcome step asks for the same profile, minus the API key card. */
+export const welcomeSchema = studentProfileSchema.omit({
+  openAiApiKey: true,
+  removeApiKey: true,
+});
 export const githubUrlSchema = z
   .url()
   .max(500)

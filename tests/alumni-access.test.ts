@@ -38,6 +38,11 @@ import {
 import { saveExamAction, startExamAction } from "@/features/exam/actions";
 import { startExam } from "@/features/exam/service";
 import { toggleLikeAction } from "@/features/community/actions";
+import {
+  completeProfileAction,
+  updateProfileAction,
+} from "@/features/profile/actions";
+import WelcomePage from "@/app/welcome/page";
 import { GET as getFile } from "@/app/api/files/[id]/route";
 import SessionsPage from "@/app/(portal)/sessions/page";
 import MaterialsPage from "@/app/(portal)/materials/page";
@@ -375,5 +380,95 @@ describe("the alumni community", () => {
     expect(
       await db.postLike.count({ where: { postId: postIds.get("student")! } }),
     ).toBe(0);
+  });
+});
+
+describe("finishing a profile", () => {
+  function profileForm(fields: Record<string, string>) {
+    const data = new FormData();
+    const all = {
+      fullName: "Fresh Finisher",
+      currentRole: "Data Scientist",
+      country: "Singapore",
+      avatarUrl: "/api/files/finisher1",
+      githubUsername: "",
+      linkedinUrl: "",
+      timezone: "Asia/Singapore",
+      bio: "",
+      openAiApiKey: "",
+      removeApiKey: "false",
+      ...fields,
+    };
+    for (const [key, value] of Object.entries(all)) data.set(key, value);
+    return data;
+  }
+  const profileOf = (name: string) =>
+    db.studentProfile.findUnique({ where: { userId: ids.get(name)! } });
+
+  beforeAll(async () => {
+    await person("finisher", { alumniBatch: 2, profile: null });
+  });
+
+  it("shows the welcome step only to someone who still has gaps", async () => {
+    actAs("finisher");
+    await expect(WelcomePage()).resolves.toBeTruthy();
+    actAs("student");
+    await expect(WelcomePage()).rejects.toThrow("REDIRECT:/dashboard");
+    actAs("admin");
+    await expect(WelcomePage()).rejects.toThrow("REDIRECT:/dashboard");
+  });
+
+  it("does not let the welcome step be finished without a photo", async () => {
+    actAs("finisher");
+    expect(
+      await completeProfileAction(null, profileForm({ avatarUrl: "" })),
+    ).toEqual({ error: "Add a profile photo" });
+    await expect(requireUser()).rejects.toThrow("REDIRECT:/welcome");
+  });
+
+  it("saves the profile and opens the portal once everything is there", async () => {
+    actAs("finisher");
+    await expect(completeProfileAction(null, profileForm({}))).rejects.toThrow(
+      "REDIRECT:/dashboard",
+    );
+    expect(await profileOf("finisher")).toMatchObject({
+      fullName: "Fresh Finisher",
+      currentRole: "Data Scientist",
+      country: "Singapore",
+      avatarUrl: "/api/files/finisher1",
+      timezone: "Asia/Singapore",
+    });
+    await expect(requireUser()).resolves.toMatchObject({
+      id: ids.get("finisher"),
+    });
+  });
+
+  it("no longer lets a student remove their photo or blank a required field", async () => {
+    actAs("student");
+    expect(
+      await updateProfileAction(null, profileForm({ avatarUrl: "" })),
+    ).toEqual({ error: "Add a profile photo" });
+    expect(
+      await updateProfileAction(null, profileForm({ country: "" })),
+    ).toEqual({ error: "Add your country" });
+    expect(await profileOf("student")).toMatchObject({
+      avatarUrl: "/api/files/fixture",
+      country: "India",
+    });
+  });
+
+  it("leaves an administrator's profile optional", async () => {
+    actAs("admin");
+    expect(
+      await updateProfileAction(
+        null,
+        profileForm({
+          fullName: "Suite Admin",
+          avatarUrl: "",
+          currentRole: "",
+          country: "",
+        }),
+      ),
+    ).toEqual({ success: "Profile saved." });
   });
 });

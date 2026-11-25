@@ -8,6 +8,7 @@ import {
 } from "@/lib/access";
 import { profileGaps } from "@/lib/profile-gaps";
 import { parseEmails } from "@/features/signup/emails";
+import { studentProfileSchema, welcomeSchema } from "@/lib/validation";
 
 describe("alumni accounts", () => {
   it("offers exactly batches 1 to 10", () => {
@@ -94,5 +95,58 @@ describe("parseEmails", () => {
 
   it("returns nothing for an empty paste", () => {
     expect(parseEmails("  \n ")).toEqual({ emails: [], invalid: [] });
+  });
+});
+
+describe("the profile every student must complete", () => {
+  const filled = {
+    fullName: "Priya Sharma",
+    currentRole: "ML Engineer",
+    country: "India",
+    avatarUrl: "/api/files/abc123",
+    githubUsername: "",
+    linkedinUrl: "",
+    timezone: "",
+    bio: "",
+  };
+  const firstError = (input: Record<string, string>) => {
+    const parsed = welcomeSchema.safeParse(input);
+    return parsed.success ? null : parsed.error.issues[0]?.message;
+  };
+
+  it("accepts a photo stored in the portal and one hosted elsewhere", () => {
+    expect(firstError(filled)).toBeNull();
+    expect(
+      firstError({ ...filled, avatarUrl: "https://example.test/me.jpg" }),
+    ).toBeNull();
+  });
+
+  it("asks for a photo when there is none", () => {
+    expect(firstError({ ...filled, avatarUrl: "" })).toBe(
+      "Add a profile photo",
+    );
+  });
+
+  it("asks for the current role and the country", () => {
+    expect(firstError({ ...filled, currentRole: " " })).toBe(
+      "Add your current role",
+    );
+    expect(firstError({ ...filled, country: "" })).toBe("Add your country");
+  });
+
+  it("still checks the optional links when they are given", () => {
+    expect(
+      firstError({ ...filled, linkedinUrl: "https://example.test/in/me" }),
+    ).toBe("Use a LinkedIn URL");
+  });
+
+  it("holds the profile screen to the same four fields", () => {
+    const parsed = studentProfileSchema.safeParse({
+      ...filled,
+      avatarUrl: "",
+      openAiApiKey: "",
+      removeApiKey: false,
+    });
+    expect(parsed.success).toBe(false);
   });
 });
