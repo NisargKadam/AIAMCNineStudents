@@ -10,7 +10,7 @@ export default async function PortalLayout({
 }) {
   // Each page applies its own guard; the shell only needs to know who is here.
   const user = await requireSignedIn();
-  const signals = await loadSignals({ id: user.id, role: user.role });
+  const signals = await loadSignals(user);
   return (
     <AppShell
       user={{

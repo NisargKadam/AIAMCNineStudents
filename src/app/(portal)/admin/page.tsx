@@ -46,6 +46,7 @@ export default async function AdminPage({
     posts,
     recent,
     confirmations,
+    waitingSignups,
   ] = await Promise.all([
     db.user.count({ where: { role: "STUDENT", ...inBatch } }),
     db.user.count({ where: { role: "STUDENT", isActive: true, ...inBatch } }),
@@ -81,6 +82,7 @@ export default async function AdminPage({
     db.prerequisiteConfirmation.count({
       where: { invalidatedAt: null, user: { role: "STUDENT", ...inBatch } },
     }),
+    db.signupRequest.count({ where: { status: "PENDING" } }),
   ]);
 
   const countFor = (status: string) =>
@@ -147,6 +149,25 @@ export default async function AdminPage({
           )
         }
       />
+
+      {waitingSignups > 0 && (
+        <Card
+          tone="raised"
+          className="mb-4 flex flex-wrap items-center gap-3 border-[color-mix(in_oklab,var(--caution)_35%,var(--line))] p-4"
+        >
+          <CircleAlert size={17} className="text-[var(--caution)]" />
+          <p className="text-ink text-sm font-semibold">
+            {waitingSignups} sign-up {pluralize(waitingSignups, "request")}{" "}
+            waiting for your approval
+          </p>
+          <Link
+            href="/admin/signups"
+            className="text-ember text-xs hover:underline"
+          >
+            Review {pluralize(waitingSignups, "it", "them")}
+          </Link>
+        </Card>
+      )}
 
       {batches.length > 0 && (
         <LinkTabs

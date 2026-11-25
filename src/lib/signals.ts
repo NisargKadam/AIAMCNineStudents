@@ -12,11 +12,13 @@ const WEEK = 7 * 24 * 60 * 60 * 1000;
 export async function loadSignals(user: {
   id: string;
   role: Role;
+  alumniBatch: number | null;
 }): Promise<ShellSignal[]> {
   const since = new Date(Date.now() - WEEK);
 
   if (user.role === Role.ADMIN) {
-    const [awaiting, freshPosts] = await Promise.all([
+    const [waitingSignups, awaiting, freshPosts] = await Promise.all([
+      db.signupRequest.count({ where: { status: "PENDING" } }),
       db.assignmentSubmission.findMany({
         where: { status: SubmissionStatus.SUBMITTED },
         orderBy: { updatedAt: "desc" },
@@ -29,13 +31,23 @@ export async function loadSignals(user: {
       db.post.count({ where: { createdAt: { gte: since } } }),
     ]);
 
-    const signals: ShellSignal[] = awaiting.map((submission) => ({
-      id: submission.id,
-      title: `Review ${submission.user.profile?.fullName ?? submission.user.email}`,
-      detail: `${submission.assignment.title} is waiting for feedback.`,
-      href: `/admin/students/${submission.user.id}`,
-      tone: "ember" as const,
-    }));
+    const signals: ShellSignal[] = [];
+    if (waitingSignups > 0)
+      signals.push({
+        id: "signups-waiting",
+        title: `${waitingSignups} sign-up ${waitingSignups === 1 ? "request" : "requests"} waiting`,
+        detail: "Former students are waiting for you to approve their access.",
+        href: "/admin/signups",
+        tone: "caution",
+      });
+    for (const submission of awaiting)
+      signals.push({
+        id: submission.id,
+        title: `Review ${submission.user.profile?.fullName ?? submission.user.email}`,
+        detail: `${submission.assignment.title} is waiting for feedback.`,
+        href: `/admin/students/${submission.user.id}`,
+        tone: "ember",
+      });
 
     if (freshPosts > 0)
       signals.push({

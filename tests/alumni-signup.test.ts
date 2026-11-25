@@ -20,9 +20,18 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-forwarded-for": state.ip }),
 }));
 
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { verifyPassword } from "@/lib/auth/crypto";
+import { hashSessionToken, verifyPassword } from "@/lib/auth/crypto";
+import { loadSignals } from "@/lib/signals";
+import {
+  addPreapprovedEmailsAction,
+  approveSignupAction,
+  declineSignupAction,
+  deleteSignupRequestAction,
+  removePreapprovedEmailAction,
+} from "@/features/admin/signup-actions";
 import { signupAction } from "@/features/signup/actions";
 import { loginAction } from "@/features/auth/actions";
 
@@ -268,5 +277,210 @@ describe("signing in while a request is undecided", () => {
     expect(await signIn("waiting", password)).toEqual({
       error: expect.stringContaining("not approved"),
     });
+  });
+});
+
+describe("the instructor's sign-up requests", () => {
+  const tokens = new Map<string, string>();
+  let adminId = "";
+
+  async function signedIn(name: string, role: "ADMIN" | "STUDENT") {
+    const user = await db.user.create({
+      data: {
+        email: address(name),
+        passwordHash: "unused-test-fixture",
+        role,
+        profile: { create: { fullName: `${suite} ${name}` } },
+      },
+    });
+    const token = randomBytes(32).toString("base64url");
+    await db.session.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashSessionToken(token),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    });
+    tokens.set(name, token);
+    return user.id;
+  }
+
+  async function request(name: string, status: "PENDING" | "DECLINED") {
+    const created = await db.signupRequest.create({
+      data: {
+        email: address(name),
+        fullName: `${suite} ${name}`,
+        alumniBatch: 4,
+        passwordHash: await bcrypt.hash(password, 4),
+        status,
+        decidedAt: status === "DECLINED" ? new Date() : null,
+      },
+    });
+    return created.id;
+  }
+
+  beforeAll(async () => {
+    adminId = await signedIn("instructor", "ADMIN");
+    await signedIn("bystander", "STUDENT");
+    state.token = tokens.get("instructor")!;
+  });
+
+  it("approving creates the account with the password the person chose", async () => {
+    const id = await request("approve-me", "PENDING");
+    expect(await approveSignupAction(id)).toHaveProperty("success");
+
+    const user = await userFor("approve-me");
+    expect(user).toMatchObject({
+      role: "STUDENT",
+      alumniBatch: 4,
+      batchId: null,
+    });
+    expect(user!.profile?.fullName).toBe(`${suite} approve-me`);
+    expect(await verifyPassword(password, user!.passwordHash)).toBe(true);
+    expect(await requestFor("approve-me")).toBeNull();
+    expect(
+      await db.auditLog.count({
+        where: {
+          actorId: adminId,
+          action: "signup_approved",
+          entityId: user!.id,
+        },
+      }),
+    ).toBe(1);
+  });
+
+  it("approving a request whose email gained an account keeps that account", async () => {
+    const id = await request("taken", "PENDING");
+    const account = await db.user.create({
+      data: {
+        email: address("taken"),
+        passwordHash: "original-hash",
+        profile: { create: { fullName: "Already Here" } },
+      },
+    });
+    expect(await approveSignupAction(id)).toHaveProperty("error");
+    expect(
+      await db.user.findUnique({ where: { id: account.id } }),
+    ).toMatchObject({ passwordHash: "original-hash", alumniBatch: null });
+    expect(await requestFor("taken")).toBeNull();
+  });
+
+  it("answers plainly when the request is already gone", async () => {
+    expect(await approveSignupAction("no-such-request")).toHaveProperty(
+      "error",
+    );
+  });
+
+  it("declining keeps the request, and it can still be approved later", async () => {
+    const id = await request("second-thoughts", "PENDING");
+    expect(await declineSignupAction(id)).toHaveProperty("success");
+    const declined = await requestFor("second-thoughts");
+    expect(declined?.status).toBe("DECLINED");
+    expect(declined?.decidedAt).toBeInstanceOf(Date);
+    expect(await userFor("second-thoughts")).toBeNull();
+
+    expect(await approveSignupAction(id)).toHaveProperty("success");
+    expect(await userFor("second-thoughts")).toMatchObject({ alumniBatch: 4 });
+  });
+
+  it("deleting removes a request without creating anything", async () => {
+    const id = await request("delete-me", "DECLINED");
+    expect(await deleteSignupRequestAction(id)).toHaveProperty("success");
+    expect(await requestFor("delete-me")).toBeNull();
+    expect(await userFor("delete-me")).toBeNull();
+  });
+
+  it("adds a pasted list once each, whatever its shape", async () => {
+    await request("paste-waiting", "PENDING");
+    await request("paste-declined", "DECLINED");
+    const pasted = [
+      address("paste-a").toUpperCase(),
+      `, ${address("paste-b")} ${address("paste-a")}`,
+      `\n<${address("paste-waiting")}>; not-an-email`,
+      address("paste-declined"),
+      address("listed"),
+    ].join(" ");
+
+    const result = await addPreapprovedEmailsAction(pasted);
+    expect(result).toHaveProperty("success");
+    expect(result).toMatchObject({ invalid: ["not-an-email"] });
+    for (const name of [
+      "paste-a",
+      "paste-b",
+      "paste-waiting",
+      "paste-declined",
+    ])
+      expect(
+        await db.preapprovedEmail.count({ where: { email: address(name) } }),
+      ).toBe(1);
+    expect(
+      await db.preapprovedEmail.count({ where: { email: address("listed") } }),
+    ).toBe(1);
+  });
+
+  it("approves a waiting request when its email is pre-approved", async () => {
+    expect(await userFor("paste-waiting")).toMatchObject({ alumniBatch: 4 });
+    expect(await requestFor("paste-waiting")).toBeNull();
+  });
+
+  it("leaves a declined request declined when its email is pre-approved, and says so", async () => {
+    expect((await requestFor("paste-declined"))?.status).toBe("DECLINED");
+    expect(await userFor("paste-declined")).toBeNull();
+    const again = await addPreapprovedEmailsAction(address("paste-declined"));
+    expect(JSON.stringify(again)).toContain(address("paste-declined"));
+    expect(JSON.stringify(again)).toContain("Declined");
+  });
+
+  it("refuses a paste with no emails in it", async () => {
+    expect(await addPreapprovedEmailsAction("  hello there ")).toHaveProperty(
+      "error",
+    );
+  });
+
+  it("removes an email from the pre-approved list", async () => {
+    expect(
+      await removePreapprovedEmailAction(address("paste-b")),
+    ).toHaveProperty("success");
+    expect(
+      await db.preapprovedEmail.count({ where: { email: address("paste-b") } }),
+    ).toBe(0);
+  });
+
+  it("puts waiting requests in the instructor's bell menu", async () => {
+    await request("in-the-bell", "PENDING");
+    const signals = await loadSignals({
+      id: adminId,
+      role: "ADMIN",
+      alumniBatch: null,
+    });
+    expect(signals.some((signal) => signal.href === "/admin/signups")).toBe(
+      true,
+    );
+  });
+
+  it("is closed to anyone who is not an administrator", async () => {
+    const id = await request("not-yours", "PENDING");
+    state.token = tokens.get("bystander")!;
+    await expect(approveSignupAction(id)).rejects.toThrow(
+      "REDIRECT:/unauthorized",
+    );
+    await expect(declineSignupAction(id)).rejects.toThrow(
+      "REDIRECT:/unauthorized",
+    );
+    await expect(deleteSignupRequestAction(id)).rejects.toThrow(
+      "REDIRECT:/unauthorized",
+    );
+    await expect(addPreapprovedEmailsAction(address("sneaky"))).rejects.toThrow(
+      "REDIRECT:/unauthorized",
+    );
+    await expect(
+      removePreapprovedEmailAction(address("listed")),
+    ).rejects.toThrow("REDIRECT:/unauthorized");
+    state.token = null;
+    await expect(approveSignupAction(id)).rejects.toThrow("REDIRECT:/login");
+    expect((await requestFor("not-yours"))?.status).toBe("PENDING");
+    expect(
+      await db.preapprovedEmail.count({ where: { email: address("sneaky") } }),
+    ).toBe(0);
   });
 });

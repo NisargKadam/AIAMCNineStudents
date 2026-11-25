@@ -12,6 +12,7 @@ import {
   ScrollText,
   ShieldCheck,
   SquareGanttChart,
+  UserPlus,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -115,6 +116,12 @@ export const navSections: NavSection[] = [
         label: "Manage students",
         icon: GraduationCap,
         hint: "Add, edit, inspect, or remove accounts",
+      },
+      {
+        href: "/admin/signups",
+        label: "Sign-up requests",
+        icon: UserPlus,
+        hint: "Approve former students and manage pre-approved emails",
       },
       {
         href: "/admin/batches",
