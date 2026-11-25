@@ -7,6 +7,7 @@ import { profileGaps } from "@/lib/profile-gaps";
 import { activeDTO, loadExam } from "@/features/exam/service";
 import { ExamBoard } from "@/features/exam/exam-board";
 import { appUrl } from "@/features/exam/certificate";
+import { getInstructor } from "@/features/exam/instructor";
 
 export const metadata = { title: "Certification exam" };
 export default async function ExamPage() {
@@ -48,6 +49,7 @@ export default async function ExamPage() {
         certificate={state.certificate}
         defaultName={user.profile?.fullName ?? ""}
         baseUrl={appUrl()}
+        instructor={getInstructor()}
       />
     </>
   );

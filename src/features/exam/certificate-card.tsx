@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  Award,
-  Download,
-  ExternalLink,
-  Share2,
-  Copy,
-  Check,
-} from "lucide-react";
+import { Award, BadgePlus, Download, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,15 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Confirm } from "@/components/ui/dialog";
 import { issueCertificateAction } from "./actions";
 import { CERTIFICATION_TITLE, type CertificateView } from "./types";
+import type { Instructor } from "./instructor";
+import { ShareCertificate } from "./share-certificate";
 
 export function CertificateCard({
   initial,
   defaultName,
   baseUrl,
+  instructor,
 }: {
   initial: CertificateView | null;
   defaultName: string;
   baseUrl: string;
+  instructor: Instructor;
 }) {
   const [certificate, setCertificate] = useState(initial);
   const [name, setName] = useState(defaultName);
@@ -151,18 +148,8 @@ export function CertificateCard({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Share2 size={16} />
-                Add to LinkedIn
-              </a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink size={16} />
-                Share achievement
+                <BadgePlus size={16} />
+                Add to LinkedIn profile
               </a>
             </Button>
             <Button
@@ -184,6 +171,11 @@ export function CertificateCard({
             <Check size={13} />
             {certificate.id}
           </p>
+          <ShareCertificate
+            certificateId={certificate.id}
+            url={url}
+            instructor={instructor}
+          />
         </>
       )}
       <Confirm

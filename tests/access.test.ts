@@ -10,6 +10,13 @@ import { profileGaps } from "@/lib/profile-gaps";
 import { parseEmails } from "@/features/signup/emails";
 import { studentProfileSchema, welcomeSchema } from "@/lib/validation";
 import { navFor } from "@/components/nav-config";
+import {
+  DEFAULT_INSTRUCTOR,
+  getInstructor,
+  instagramCaption,
+  linkedinComposeUrl,
+  linkedinPost,
+} from "@/features/exam/instructor";
 
 describe("alumni accounts", () => {
   it("offers exactly batches 1 to 10", () => {
@@ -187,5 +194,71 @@ describe("the menu each person gets", () => {
       expect(navFor(viewer).every((section) => section.items.length > 0)).toBe(
         true,
       );
+  });
+});
+
+describe("sharing a certificate", () => {
+  const url = "https://portal.example.test/certificates/abc-123";
+  const instructor = {
+    name: "Ada Instructor",
+    linkedinUrl: "https://www.linkedin.com/in/ada-instructor/",
+    instagramHandle: "ada.teaches",
+  };
+
+  it("writes a LinkedIn post that credits the instructor and links the certificate", () => {
+    const post = linkedinPost(url, instructor);
+    expect(post).toContain("Ada Instructor");
+    expect(post).toContain("https://www.linkedin.com/in/ada-instructor/");
+    expect(post).toContain(url);
+  });
+
+  it("opens LinkedIn's composer with that post already written", () => {
+    const post = linkedinPost(url, instructor);
+    const compose = new URL(linkedinComposeUrl(post));
+    expect(compose.origin + compose.pathname).toBe(
+      "https://www.linkedin.com/feed/",
+    );
+    expect(compose.searchParams.get("shareActive")).toBe("true");
+    expect(compose.searchParams.get("text")).toBe(post);
+  });
+
+  it("writes an Instagram caption that tags the instructor's handle", () => {
+    const caption = instagramCaption(url, instructor);
+    expect(caption).toContain("@ada.teaches");
+    expect(caption).toContain(url);
+  });
+
+  it("accepts a handle written with or without the @", () => {
+    expect(
+      instagramCaption(url, { ...instructor, instagramHandle: "@ada.teaches" }),
+    ).toContain(" @ada.teaches");
+  });
+
+  it("offers no Instagram caption when there is no handle to tag", () => {
+    expect(
+      instagramCaption(url, { ...instructor, instagramHandle: "" }),
+    ).toBeNull();
+  });
+
+  it("credits the masterclass instructor by default", () => {
+    expect(DEFAULT_INSTRUCTOR.name).toBe("Nisarg Kadam");
+    expect(DEFAULT_INSTRUCTOR.linkedinUrl).toMatch(
+      /^https:\/\/www\.linkedin\.com\/in\/[a-z0-9-]+\/$/,
+    );
+  });
+
+  it("lets the deployment set the instructor's handles", () => {
+    const before = { ...process.env };
+    process.env.INSTRUCTOR_INSTAGRAM_HANDLE = " @from.env ";
+    process.env.INSTRUCTOR_LINKEDIN_URL =
+      "https://www.linkedin.com/in/from-env/";
+    try {
+      expect(getInstructor()).toMatchObject({
+        instagramHandle: "from.env",
+        linkedinUrl: "https://www.linkedin.com/in/from-env/",
+      });
+    } finally {
+      process.env = before;
+    }
   });
 });
