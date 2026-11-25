@@ -67,6 +67,11 @@ export const getCurrentUser = cache(async () => {
  * profile must still reach: the shell, the welcome step, saving a profile,
  * uploading a photo, and an exam that is already running.
  */
+/** The signed-in person as every guard returns them. */
+export type CurrentUser = NonNullable<
+  Awaited<ReturnType<typeof getCurrentUser>>
+>;
+
 export async function requireSignedIn() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");

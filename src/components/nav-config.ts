@@ -22,6 +22,8 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   hint: string;
+  /** Open to certification-only accounts as well as full students. */
+  alumni?: true;
 };
 
 export type NavSection = {
@@ -36,6 +38,7 @@ export const navSections: NavSection[] = [
     items: [
       {
         href: "/dashboard",
+        alumni: true,
         label: "Dashboard",
         icon: LayoutDashboard,
         hint: "Progress and what to do next",
@@ -66,12 +69,14 @@ export const navSections: NavSection[] = [
       },
       {
         href: "/exam",
+        alumni: true,
         label: "Exam",
         icon: GraduationCap,
         hint: "Timed assessment and your AI AMC certification",
       },
       {
         href: "/profile",
+        alumni: true,
         label: "My profile",
         icon: UserRound,
         hint: "Your details, avatar, and API key",
@@ -83,6 +88,7 @@ export const navSections: NavSection[] = [
     items: [
       {
         href: "/community",
+        alumni: true,
         label: "Community",
         icon: MessageSquare,
         hint: "Share progress and ask questions",
@@ -168,6 +174,25 @@ export const navSections: NavSection[] = [
     ],
   },
 ];
+
+/**
+ * The menu for one person. Alumni hold a certification-only account, so they
+ * get the handful of places they can open; a section left empty is dropped.
+ */
+export function navFor(viewer: {
+  role: "ADMIN" | "STUDENT";
+  alumni: boolean;
+}): NavSection[] {
+  return navSections
+    .filter((section) => !section.adminOnly || viewer.role === "ADMIN")
+    .map((section) => ({
+      ...section,
+      items: viewer.alumni
+        ? section.items.filter((item) => item.alumni)
+        : section.items,
+    }))
+    .filter((section) => section.items.length > 0);
+}
 
 const titles = new Map(
   navSections.flatMap((section) =>

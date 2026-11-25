@@ -129,8 +129,9 @@ export function WelcomeForm({
           </div>
 
           <p className="text-dim num text-xs">
-            Step {Math.min(done + 1, required.length)} of {required.length}
-            {done === required.length && " — all set"}
+            {done === required.length
+              ? "All four done"
+              : `${done} of ${required.length} done`}
           </p>
           <h2 className="font-display text-ink mt-2 text-3xl font-semibold">
             One minute and you are in, {greeting}

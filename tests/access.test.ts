@@ -9,6 +9,7 @@ import {
 import { profileGaps } from "@/lib/profile-gaps";
 import { parseEmails } from "@/features/signup/emails";
 import { studentProfileSchema, welcomeSchema } from "@/lib/validation";
+import { navFor } from "@/components/nav-config";
 
 describe("alumni accounts", () => {
   it("offers exactly batches 1 to 10", () => {
@@ -148,5 +149,43 @@ describe("the profile every student must complete", () => {
       removeApiKey: false,
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("the menu each person gets", () => {
+  const hrefs = (viewer: Parameters<typeof navFor>[0]) =>
+    navFor(viewer).flatMap((section) => section.items.map((item) => item.href));
+
+  it("gives an alumnus only home, the exam, their profile, and the community", () => {
+    expect(hrefs({ role: "STUDENT", alumni: true })).toEqual([
+      "/dashboard",
+      "/exam",
+      "/profile",
+      "/community",
+    ]);
+  });
+
+  it("gives a current student the full portal and no admin console", () => {
+    const menu = hrefs({ role: "STUDENT", alumni: false });
+    expect(menu).toContain("/sessions");
+    expect(menu).toContain("/assignments");
+    expect(menu.some((href) => href.startsWith("/admin"))).toBe(false);
+  });
+
+  it("gives an administrator everything, including sign-up requests", () => {
+    const menu = hrefs({ role: "ADMIN", alumni: false });
+    expect(menu).toContain("/sessions");
+    expect(menu).toContain("/admin/signups");
+  });
+
+  it("leaves no empty section in anyone's menu", () => {
+    for (const viewer of [
+      { role: "STUDENT", alumni: true },
+      { role: "STUDENT", alumni: false },
+      { role: "ADMIN", alumni: false },
+    ] as const)
+      expect(navFor(viewer).every((section) => section.items.length > 0)).toBe(
+        true,
+      );
   });
 });

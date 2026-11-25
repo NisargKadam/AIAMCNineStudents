@@ -43,6 +43,9 @@ import {
   updateProfileAction,
 } from "@/features/profile/actions";
 import WelcomePage from "@/app/welcome/page";
+import DashboardPage from "@/app/(portal)/dashboard/page";
+import { AlumniHome } from "@/features/dashboard/alumni-home";
+import { loadSignals } from "@/lib/signals";
 import { GET as getFile } from "@/app/api/files/[id]/route";
 import SessionsPage from "@/app/(portal)/sessions/page";
 import MaterialsPage from "@/app/(portal)/materials/page";
@@ -470,5 +473,36 @@ describe("finishing a profile", () => {
         }),
       ),
     ).toEqual({ success: "Profile saved." });
+  });
+});
+
+describe("the alumni home", () => {
+  it("replaces the coursework dashboard for an alumnus", async () => {
+    actAs("alumna7");
+    const page = (await DashboardPage()) as { type: unknown };
+    expect(page.type).toBe(AlumniHome);
+  });
+
+  it("keeps the coursework dashboard for a current student", async () => {
+    actAs("student");
+    const page = (await DashboardPage()) as { type: unknown };
+    expect(page.type).not.toBe(AlumniHome);
+  });
+
+  it("loads the exam state and the alumni feed without error", async () => {
+    actAs("alumna7");
+    const user = await requireUser();
+    await expect(AlumniHome({ user })).resolves.toBeTruthy();
+  });
+
+  it("only ever points an alumnus at places they can open", async () => {
+    const signals = await loadSignals({
+      id: ids.get("alumnus3")!,
+      role: Role.STUDENT,
+      alumniBatch: 3,
+    });
+    const allowed = ["/exam", "/community", "/profile", "/dashboard"];
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((signal) => allowed.includes(signal.href))).toBe(true);
   });
 });

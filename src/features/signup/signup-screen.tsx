@@ -18,7 +18,7 @@ import { batchLabel, cn, firstName } from "@/lib/utils";
 import { passwordRules } from "@/lib/validation";
 import { EXAM_MINUTES, PASS_SCORE } from "@/features/exam/types";
 import { signupAction } from "./actions";
-import { CertificatePlate } from "./certificate-plate";
+import { CertificatePlate } from "@/features/exam/certificate-plate";
 
 const facts = [
   { value: `${EXAM_MINUTES} min`, label: "One timed exam" },
@@ -48,12 +48,12 @@ export function SignupScreen() {
       <section className="relative z-10 hidden flex-col justify-between overflow-hidden p-10 lg:flex xl:p-14">
         <Brand href="/login" />
 
-        <div className="max-w-lg py-8">
+        <div className="max-w-xl py-8">
           <p className="text-dim mb-4 flex items-center gap-2.5 text-xs">
             <span className="bg-ember h-3.5 w-[3px] rounded-full" />
             For students of Batches 1 to 10
           </p>
-          <h1 className="font-display text-ink text-[40px] leading-[1.06] font-semibold tracking-[-.035em] text-balance xl:text-[48px]">
+          <h1 className="font-display text-ink max-w-lg text-[38px] leading-[1.06] font-semibold tracking-[-.035em] text-balance xl:text-[44px]">
             You did the work. Come back for the certificate.
           </h1>
           <p className="text-dim mt-5 max-w-md text-sm leading-7">
@@ -61,21 +61,22 @@ export function SignupScreen() {
             verified credential you can share on LinkedIn.
           </p>
 
-          <CertificatePlate name={name} className="mt-10 max-w-[25rem]" />
-
-          <dl className="mt-12 grid max-w-md grid-cols-3 gap-3">
-            {facts.map((fact) => (
-              <div
-                key={fact.label}
-                className="rounded-xl border border-[var(--line)] bg-[color-mix(in_oklab,var(--panel)_60%,transparent)] px-3.5 py-3"
-              >
-                <dd className="font-display text-ink num text-lg font-semibold">
-                  {fact.value}
-                </dd>
-                <dt className="text-dim mt-0.5 text-[11px]">{fact.label}</dt>
-              </div>
-            ))}
-          </dl>
+          <div className="mt-9 flex items-center gap-9">
+            <CertificatePlate name={name} className="w-[21rem] shrink-0" />
+            <dl className="hidden w-36 space-y-3 xl:block">
+              {facts.map((fact) => (
+                <div
+                  key={fact.label}
+                  className="rounded-xl border border-[var(--line)] bg-[color-mix(in_oklab,var(--panel)_60%,transparent)] px-3.5 py-3"
+                >
+                  <dd className="font-display text-ink num text-lg font-semibold">
+                    {fact.value}
+                  </dd>
+                  <dt className="text-dim mt-0.5 text-[11px]">{fact.label}</dt>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
 
         <p className="text-faint text-xs">
