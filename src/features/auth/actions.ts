@@ -38,6 +38,23 @@ export async function loginAction(_: unknown, formData: FormData) {
   await db.loginAttempt.create({
     data: { identifier, succeeded: Boolean(valid && user?.isActive) },
   });
+  if (!user) {
+    // Someone who signed up and has no account yet gets a straight answer,
+    // but only when they prove the request is theirs with its password.
+    const request = await db.signupRequest.findUnique({
+      where: { email: parsed.data.email },
+    });
+    if (
+      request &&
+      (await verifyPassword(parsed.data.password, request.passwordHash))
+    )
+      return {
+        error:
+          request.status === "DECLINED"
+            ? "Your sign-up request was not approved. Contact your instructor if you think this is a mistake."
+            : "Your sign-up is waiting for approval. You will be able to sign in as soon as your instructor approves it.",
+      };
+  }
   if (!user || !valid) return { error: "Invalid email or password." };
   if (!user.isActive)
     return { error: "This account is inactive. Contact an administrator." };

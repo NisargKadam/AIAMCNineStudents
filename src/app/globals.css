@@ -331,6 +331,22 @@ h3,
   animation: settle 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* A slow hover for the few objects meant to feel held in the air. It lives
+   on its own wrapper, never on an element whose transform is driven by the
+   pointer, because a running animation would override that transform. */
+.floaty {
+  animation: float 5.5s ease-in-out infinite alternate;
+}
+
+@keyframes float {
+  from {
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
 /* --- Route progress bar ----------------------------------------- */
 @keyframes crawl {
   0% {
@@ -403,7 +419,8 @@ h3,
   }
   .glide,
   .glide > *,
-  .rise {
+  .rise,
+  .floaty {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
